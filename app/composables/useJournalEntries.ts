@@ -3,26 +3,9 @@
 // automatically elsewhere (payments/expenses/etc. via a JournalTemplate) and
 // only ever show up read-only in this list.
 
-export type JournalEntryStatus = 'DRAFT' | 'POSTED' | 'VOID'
+import type { JournalSourceType } from '#shared/domain'
 
-// MANUAL entries are created directly by an accountant; every other value names
-// the business event an active JournalTemplate auto-posts from. Kept in sync
-// with useJournalTemplates.ts's identical JournalSourceType definition.
-export type JournalSourceType =
-  | 'MANUAL'
-  | 'RENT_PAYMENT'
-  | 'DEPOSIT_PAYMENT'
-  | 'DEPOSIT_REFUND'
-  | 'UTILITY_BILL'
-  | 'SALE_PAYMENT'
-  | 'SALE_REFUND'
-  | 'EXPENSE'
-  | 'COMMISSION'
-  | 'LOAN_PAYMENT'
-  | 'RENT_REFUND'
-  | 'CREDIT_NOTE'
-  | 'DEBIT_NOTE'
-  | 'PAYABLE_PAYMENT'
+export type JournalEntryStatus = 'DRAFT' | 'POSTED' | 'VOID'
 
 export interface JournalEntryLine {
   id: number

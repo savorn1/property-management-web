@@ -490,8 +490,12 @@ const loading = ref(false)
 const error = ref('')
 
 const initialStatus = (route.query.status as SaleAgreementStatus | undefined) || undefined
+// Only seeded here when arriving as a plain filter link (e.g. from a property's
+// overview page) — the reservation "create agreement" hand-off below also sends
+// unitId, but is distinguished by reservationId and takes over via showCreate.
+const initialUnitId = route.query.reservationId ? undefined : Number(route.query.unitId) || undefined
 const filter = reactive<{ unitId: number | undefined; buyerId: number | undefined; status: SaleAgreementStatus | undefined }>({
-  unitId: undefined,
+  unitId: initialUnitId,
   buyerId: undefined,
   status: initialStatus
 })
@@ -624,7 +628,7 @@ onMounted(async () => {
   await loadOptions()
   await load()
   const q = route.query
-  if (q.reservationId || q.unitId) {
+  if (q.reservationId) {
     createForm.value = {
       agreementDate: new Date().toISOString().slice(0, 10),
       unitId: q.unitId ? Number(q.unitId) : undefined,

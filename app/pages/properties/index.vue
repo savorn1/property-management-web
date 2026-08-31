@@ -21,6 +21,8 @@
           class="w-44"
           @keyup.enter="load"
         />
+        <USelect v-model="filter.type" :items="typeFilterOptions" placeholder="Type" class="w-44" />
+        <USelect v-model="filter.zoneId" :items="zoneFilterOptions" placeholder="Zone" class="w-44" />
         <UButton size="sm" color="neutral" variant="soft" icon="i-lucide-search" @click="load">Search</UButton>
         <UButton
           v-if="hasActiveFilter"
@@ -56,10 +58,19 @@
         export-filename="properties"
         :row-number-start="(page - 1) * pageSize"
         @refresh="load"
-        @select="(row) => navigateTo(`/buildings?propertyId=${row.id}`)"
+        @select="(row) => navigateTo(`/properties/${row.id}`)"
       >
         <template #actions-data="{ row }">
           <div class="flex items-center gap-2">
+            <UButton
+              size="xs"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-eye"
+              @click.stop="navigateTo(`/properties/${row.id}`)"
+            >
+              Overview
+            </UButton>
             <UButton
               size="xs"
               color="neutral"
@@ -233,13 +244,14 @@
 
 <script setup lang="ts">
 import type { ColumnDef, FieldDef } from '#shared/types'
-import type { PropertyItem, PropertyPayload } from '~/composables/useProperties'
+import type { PropertyItem, PropertyPayload, PropertyType } from '~/composables/useProperties'
 import type { PropertyDocument } from '~/composables/usePropertyDocuments'
 import type { PropertyCertificate } from '~/composables/usePropertyCertificates'
 
 const { list, create, update, remove } = useProperties()
 const { list: listDocuments, upload: uploadDocument, remove: removeDocument, download: downloadDocument } = usePropertyDocuments()
 const { list: listCertificates, upload: uploadCertificate, remove: removeCertificate, download: downloadCertificate } = usePropertyCertificates()
+const { list: listZones } = useZones()
 const { isAdmin } = useAuth()
 const toast = useToast()
 
@@ -247,7 +259,33 @@ const rows = ref<PropertyItem[]>([])
 const loading = ref(false)
 const error = ref('')
 
-const filter = reactive({ name: '', city: '' })
+const filter = reactive<{ name: string; city: string; type: PropertyType | undefined; zoneId: number | undefined }>({
+  name: '',
+  city: '',
+  type: undefined,
+  zoneId: undefined
+})
+
+const zoneOptions = ref<{ label: string; value: number }[]>([])
+const zoneFilterOptions = computed(() => [{ label: 'All zones', value: undefined }, ...zoneOptions.value])
+
+async function loadZoneOptions() {
+  const res = await listZones({ size: 200 })
+  zoneOptions.value = res.data.map((z) => ({ label: z.name, value: z.id }))
+}
+
+const PROPERTY_TYPE_OPTIONS: { label: string; value: PropertyType }[] = [
+  { label: 'Apartment', value: 'APARTMENT' },
+  { label: 'Condominium', value: 'CONDOMINIUM' },
+  { label: 'Office', value: 'OFFICE' },
+  { label: 'Shopping mall', value: 'SHOPPING_MALL' },
+  { label: 'Warehouse', value: 'WAREHOUSE' },
+  { label: 'Villa', value: 'VILLA' },
+  { label: 'House', value: 'HOUSE' },
+  { label: 'Land', value: 'LAND' },
+  { label: 'Mixed use', value: 'MIXED_USE' }
+]
+const typeFilterOptions = [{ label: 'All types', value: undefined }, ...PROPERTY_TYPE_OPTIONS]
 
 const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   column: 'id',
@@ -258,6 +296,8 @@ const { page, pageSize, total, rows: pagedRows } = useClientTable(rows, { pageSi
 
 const columns: ColumnDef<PropertyItem>[] = [
   { key: 'name', sortable: true },
+  { key: 'type', value: (row) => (row.type ? formatEnum(row.type) : '—') },
+  { key: 'zoneName', label: 'Zone', value: (row) => row.zoneName ?? '—' },
   { key: 'code', value: (row) => row.code ?? '—' },
   { key: 'city', value: (row) => row.city ?? '—' },
   { key: 'state', value: (row) => row.state ?? '—' },
@@ -272,6 +312,8 @@ async function load() {
     const res = await list({
       name: filter.name || undefined,
       city: filter.city || undefined,
+      type: filter.type,
+      zoneId: filter.zoneId,
       sortBy: sort.value?.column,
       sortOrder: sort.value?.direction,
       size: 200
@@ -284,16 +326,18 @@ async function load() {
   }
 }
 
-const fields: FieldDef[] = [
+const fields = computed<FieldDef[]>(() => [
   { name: 'name', required: true },
-  { name: 'code' },
+  { name: 'type', label: 'Property type', type: 'select', required: true, options: PROPERTY_TYPE_OPTIONS, wrapper: 'half' },
+  { name: 'zoneId', label: 'Zone', type: 'select', options: zoneOptions.value, wrapper: 'half' },
+  { name: 'code', wrapper: 'half' },
   { name: 'address', wrapper: 'full' },
   { name: 'city' },
   { name: 'state' },
   { name: 'postalCode', label: 'Postal code' },
   { name: 'country' },
   { name: 'description', type: 'textarea', wrapper: 'full' }
-]
+])
 
 const {
   showCreate,
@@ -325,6 +369,8 @@ const {
     toForm: (row) => ({
       name: row.name,
       code: row.code ?? '',
+      type: row.type ?? undefined,
+      zoneId: row.zoneId ?? undefined,
       address: row.address ?? '',
       city: row.city ?? '',
       state: row.state ?? '',
@@ -334,7 +380,9 @@ const {
     }),
     toPayload: (values) => ({
       name: values.name,
+      type: values.type,
       code: values.code || undefined,
+      zoneId: values.zoneId || undefined,
       address: values.address || undefined,
       city: values.city || undefined,
       state: values.state || undefined,
@@ -345,14 +393,22 @@ const {
   }
 )
 
-onMounted(load)
+onMounted(async () => {
+  await loadZoneOptions()
+  await load()
+})
 watch(sort, load)
+watch(() => [filter.type, filter.zoneId], load)
 
-const hasActiveFilter = computed(() => filter.name !== '' || filter.city !== '')
+const hasActiveFilter = computed(
+  () => filter.name !== '' || filter.city !== '' || filter.type !== undefined || filter.zoneId !== undefined
+)
 
 function clearFilters() {
   filter.name = ''
   filter.city = ''
+  filter.type = undefined
+  filter.zoneId = undefined
   load()
 }
 

@@ -3,7 +3,7 @@
 // sale agreement (get-or-404, create-once — no update endpoint), so it's
 // folded into the Sale Agreements "Manage" modal rather than a standalone page.
 
-export type InspectionCondition = 'EXCELLENT' | 'GOOD' | 'FAIR' | 'POOR'
+import type { InspectionCondition } from '#shared/domain'
 
 export interface SaleHandover {
   id: number

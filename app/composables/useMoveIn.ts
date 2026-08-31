@@ -2,8 +2,9 @@
 // workflow: request -> approve/reject -> record inspection + key handovers ->
 // complete. Reads are open to any authenticated user; writes are ADMIN-only.
 
+import type { CreateInspectionPayload, InspectionCondition } from '#shared/domain'
+
 export type MoveInStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED'
-export type InspectionCondition = 'EXCELLENT' | 'GOOD' | 'FAIR' | 'POOR'
 
 export interface MoveInRequest {
   id: number
@@ -48,13 +49,6 @@ export interface MoveInInspection {
   condition: InspectionCondition
   notes: string | null
   createdAt: string
-}
-
-export interface CreateInspectionPayload {
-  inspectionDate: string
-  inspectedBy: string
-  condition: InspectionCondition
-  notes?: string
 }
 
 export interface KeyHandover {

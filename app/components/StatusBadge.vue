@@ -33,12 +33,17 @@ const STATUS_META: Record<string, { color: StatusColor; icon: string }> = {
   UP: { color: 'success', icon: 'i-lucide-check-circle' },
   DOWN: { color: 'error', icon: 'i-lucide-x-circle' },
   DISABLED: { color: 'neutral', icon: 'i-lucide-power-off' },
-  // Unit status (useUnits' UnitStatus).
+  // Unit occupancy status (useUnits' OccupancyStatus) — AVAILABLE is a
+  // ParkingSpotStatus value, not occupancy's (that one uses VACANT).
   AVAILABLE: { color: 'success', icon: 'i-lucide-check-circle' },
+  VACANT: { color: 'success', icon: 'i-lucide-check-circle' },
   OCCUPIED: { color: 'info', icon: 'i-lucide-door-closed' },
   RESERVED: { color: 'warning', icon: 'i-lucide-bookmark' },
   MAINTENANCE: { color: 'warning', icon: 'i-lucide-wrench' },
   UNAVAILABLE: { color: 'cancelled', icon: 'i-lucide-ban' },
+  // Unit sale status (useUnits' SaleStatus) — RESERVED/SOLD already covered.
+  NOT_FOR_SALE: { color: 'neutral', icon: 'i-lucide-circle-slash' },
+  FOR_SALE: { color: 'info', icon: 'i-lucide-tag' },
   SOLD: { color: 'secondary', icon: 'i-lucide-tag' },
   // Tenant status (useTenants' TenantStatus) — ACTIVE already covered above.
   INACTIVE: { color: 'neutral', icon: 'i-lucide-power-off' },
@@ -82,7 +87,11 @@ const STATUS_META: Record<string, { color: StatusColor; icon: string }> = {
   POOR: { color: 'error', icon: 'i-lucide-thumbs-down' },
   // Deposit settlement status (useMoveOut' SettlementStatus) — PENDING already
   // covered above.
-  SETTLED: { color: 'success', icon: 'i-lucide-badge-check' }
+  SETTLED: { color: 'success', icon: 'i-lucide-badge-check' },
+  // Building status (useBuildings' BuildingStatus) — ACTIVE/INACTIVE already
+  // covered above.
+  UNDER_CONSTRUCTION: { color: 'warning', icon: 'i-lucide-hard-hat' },
+  RENOVATION: { color: 'warning', icon: 'i-lucide-hammer' }
 }
 
 const DEFAULT_META: { color: StatusColor; icon: string } = {

@@ -3,6 +3,8 @@
 // sale listing for a buyer ahead of a full SaleAgreement — either created
 // directly here, or produced by Lead.convertToReservation.
 
+import type { PaymentMethod } from '#shared/domain'
+
 export type ReservationStatus = 'ACTIVE' | 'CONVERTED' | 'EXPIRED' | 'CANCELLED'
 
 export interface SaleReservation {
@@ -37,8 +39,6 @@ export interface CreateSaleReservationPayload {
   expiryDate?: string
   notes?: string
 }
-
-export type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'CHECK' | 'ONLINE' | 'OTHER'
 
 export interface SalePayment {
   id: number

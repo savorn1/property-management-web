@@ -3,26 +3,9 @@
 // elsewhere in the app, its lines tell AccountingPostingService which
 // accounts/sides/amount-components to post a JournalEntry from.
 
-export type JournalLineSide = 'DEBIT' | 'CREDIT'
+import type { JournalSourceType } from '#shared/domain'
 
-// MANUAL entries are created directly by an accountant; every other value names
-// the business event an active JournalTemplate auto-posts from. Kept in sync
-// with useJournalEntries.ts's identical JournalSourceType definition.
-export type JournalSourceType =
-  | 'MANUAL'
-  | 'RENT_PAYMENT'
-  | 'DEPOSIT_PAYMENT'
-  | 'DEPOSIT_REFUND'
-  | 'UTILITY_BILL'
-  | 'SALE_PAYMENT'
-  | 'SALE_REFUND'
-  | 'EXPENSE'
-  | 'COMMISSION'
-  | 'LOAN_PAYMENT'
-  | 'RENT_REFUND'
-  | 'CREDIT_NOTE'
-  | 'DEBIT_NOTE'
-  | 'PAYABLE_PAYMENT'
+export type JournalLineSide = 'DEBIT' | 'CREDIT'
 
 export interface JournalTemplateLine {
   id: number

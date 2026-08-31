@@ -1,6 +1,8 @@
 // Wraps the backend's LeaseController plus the lease-nested rent-configuration
 // and deposit-payment endpoints (/api/leases/**).
 
+import type { BillingCycle, PaymentMethod } from '#shared/domain'
+
 export type LeaseStatus = 'PENDING_APPROVAL' | 'ACTIVE' | 'TERMINATED'
 
 export interface Lease {
@@ -66,7 +68,6 @@ export interface LeaseHistoryEntry {
   createdAt: string
 }
 
-export type BillingCycle = 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
 export type LateFeeType = 'NONE' | 'FIXED' | 'PERCENTAGE'
 
 export interface RentConfiguration {
@@ -88,8 +89,6 @@ export interface RentConfigurationPayload {
   lateFeeAmount?: number
   gracePeriodDays?: number
 }
-
-export type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'CHECK' | 'ONLINE' | 'OTHER'
 
 export interface DepositPayment {
   id: number

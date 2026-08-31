@@ -114,6 +114,7 @@
 import type { ColumnDef, FieldDef } from '#shared/types'
 import type { CreateUtilityBillPayload, UtilityBill, UtilityBillStatus } from '~/composables/useUtilityBills'
 
+const route = useRoute()
 const { isAdmin } = useAuth()
 const { list, create, updateStatus } = useUtilityBills()
 const { list: listMeters } = useMeters()
@@ -123,9 +124,10 @@ const rows = ref<UtilityBill[]>([])
 const loading = ref(false)
 const error = ref('')
 
+const initialStatus = (route.query.status as UtilityBillStatus | undefined) || undefined
 const filter = reactive<{ meterId: number | undefined; status: UtilityBillStatus | undefined }>({
   meterId: undefined,
-  status: undefined
+  status: initialStatus
 })
 
 const meterOptions = ref<{ label: string; value: number }[]>([])

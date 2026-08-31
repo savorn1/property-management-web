@@ -204,6 +204,7 @@ import type {
 } from '~/composables/useParkingSpots'
 import type { CreateParkingAssignmentPayload, ParkingAssignment } from '~/composables/useParkingAssignments'
 
+const route = useRoute()
 const { isAdmin } = useAuth()
 const { list, create, update, updateStatus, remove } = useParkingSpots()
 const { list: listAssignments, create: createAssignment, end: endAssignment } = useParkingAssignments()
@@ -215,10 +216,11 @@ const rows = ref<ParkingSpot[]>([])
 const loading = ref(false)
 const error = ref('')
 
+const initialStatus = (route.query.status as ParkingSpotStatus | undefined) || undefined
 const filter = reactive<{ buildingId: number | undefined; type: ParkingSpotType | undefined; status: ParkingSpotStatus | undefined }>({
   buildingId: undefined,
   type: undefined,
-  status: undefined
+  status: initialStatus
 })
 
 const buildingOptions = ref<{ label: string; value: number }[]>([])

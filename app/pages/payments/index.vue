@@ -84,7 +84,7 @@
 
 <script setup lang="ts">
 import type { ColumnDef } from '#shared/types'
-import type { Payment, PaymentMethod, PaymentType } from '~/composables/usePayments'
+import type { Payment, PaymentMethod, PaymentType } from '#shared/domain'
 
 const { list } = usePayments()
 

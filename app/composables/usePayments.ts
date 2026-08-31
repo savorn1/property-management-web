@@ -3,22 +3,7 @@
 // open to any authenticated user. Payments themselves are recorded via
 // Invoices' "Record payment" action or Leases' deposit-payment flow, not here.
 
-export type PaymentType = 'RENT' | 'DEPOSIT'
-export type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'CHECK' | 'ONLINE' | 'OTHER'
-
-export interface Payment {
-  id: number
-  leaseId: number | null
-  invoiceId: number | null
-  type: PaymentType
-  amount: number
-  paymentDate: string
-  method: PaymentMethod
-  referenceNumber: string | null
-  notes: string | null
-  recordedBy: string | null
-  createdAt: string
-}
+import type { Payment, PaymentMethod, PaymentType } from '#shared/domain'
 
 export interface PaymentFilter {
   leaseId?: number

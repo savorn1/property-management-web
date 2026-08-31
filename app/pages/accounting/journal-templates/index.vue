@@ -258,7 +258,8 @@
 
 <script setup lang="ts">
 import type { ColumnDef } from '#shared/types'
-import type { JournalLineSide, JournalSourceType, JournalTemplate } from '~/composables/useJournalTemplates'
+import type { JournalLineSide, JournalTemplate } from '~/composables/useJournalTemplates'
+import type { JournalSourceType } from '#shared/domain'
 
 definePageMeta({ middleware: 'admin' })
 

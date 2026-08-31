@@ -229,7 +229,6 @@
 <script setup lang="ts">
 import type { ColumnDef, FieldDef } from '#shared/types'
 import type {
-  CreateInspectionPayload,
   CreateKeyHandoverPayload,
   CreateMoveInPayload,
   KeyHandover,
@@ -237,6 +236,7 @@ import type {
   MoveInRequest,
   MoveInStatus
 } from '~/composables/useMoveIn'
+import type { CreateInspectionPayload } from '#shared/domain'
 
 const route = useRoute()
 const { isAdmin } = useAuth()

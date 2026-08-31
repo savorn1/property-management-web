@@ -304,7 +304,8 @@
 
 <script setup lang="ts">
 import type { ColumnDef, FieldDef } from '#shared/types'
-import type { CreateInvoicePayload, CreatePaymentPayload, Invoice, InvoiceStatus, Payment } from '~/composables/useInvoices'
+import type { CreateInvoicePayload, CreatePaymentPayload, Invoice, InvoiceStatus } from '~/composables/useInvoices'
+import type { Payment } from '#shared/domain'
 import type { CreateCreditNotePayload, CreditNote } from '~/composables/useCreditNotes'
 import type { CreateDebitNotePayload, DebitNote } from '~/composables/useDebitNotes'
 import type { CreateRefundPayload, Refund } from '~/composables/useRefunds'

@@ -1,7 +1,15 @@
 // Wraps the backend's UnitController (/api/units). Every unit belongs to a
 // unit type (which in turn belongs to a floor/building/property).
+//
+// Occupancy and sale status are two independent dimensions on the backend —
+// a unit can be OCCUPIED (rent side) while also FOR_SALE (sale side) — each
+// with its own PUT endpoint and optional `reason`, verified against the live
+// backend's /v3/api-docs. There is no single combined "status" field/endpoint
+// (an earlier version of this file assumed one; PUT /api/units/{id}/status
+// doesn't exist and would 404).
 
-export type UnitStatus = 'AVAILABLE' | 'OCCUPIED' | 'RESERVED' | 'MAINTENANCE' | 'UNAVAILABLE' | 'SOLD'
+export type OccupancyStatus = 'VACANT' | 'RESERVED' | 'OCCUPIED' | 'MAINTENANCE' | 'UNAVAILABLE'
+export type SaleStatus = 'NOT_FOR_SALE' | 'FOR_SALE' | 'RESERVED' | 'SOLD'
 
 export interface Unit {
   id: number
@@ -14,7 +22,14 @@ export interface Unit {
   propertyId: number | null
   propertyName: string | null
   unitNumber: string
-  status: UnitStatus
+  name: string | null
+  occupancyStatus: OccupancyStatus | null
+  saleStatus: SaleStatus | null
+  kitchen: boolean | null
+  balcony: boolean | null
+  furnished: boolean | null
+  view: string | null
+  orientation: string | null
   description: string | null
   createdAt: string
   updatedAt: string
@@ -22,7 +37,8 @@ export interface Unit {
 
 export interface UnitFilter {
   unitTypeId?: number
-  status?: UnitStatus
+  occupancyStatus?: OccupancyStatus
+  saleStatus?: SaleStatus
   unitNumber?: string
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
@@ -33,13 +49,49 @@ export interface UnitFilter {
 export interface CreateUnitPayload {
   unitTypeId: number
   unitNumber: string
-  status?: UnitStatus
+  name?: string
+  occupancyStatus?: OccupancyStatus
+  saleStatus?: SaleStatus
+  kitchen?: boolean
+  balcony?: boolean
+  furnished?: boolean
+  view?: string
+  orientation?: string
   description?: string
 }
 
+// No occupancy/sale status here — those only change through their own
+// dedicated endpoints below, not the general update.
 export interface UpdateUnitPayload {
   unitNumber?: string
+  name?: string
+  kitchen?: boolean
+  balcony?: boolean
+  furnished?: boolean
+  view?: string
+  orientation?: string
   description?: string
+}
+
+export interface UpdateOccupancyStatusPayload {
+  occupancyStatus: OccupancyStatus
+  reason?: string
+}
+
+export interface UpdateSaleStatusPayload {
+  saleStatus: SaleStatus
+  reason?: string
+}
+
+export interface UnitStatusHistoryEntry {
+  id: number
+  unitId: number
+  statusField: string
+  previousStatus: string | null
+  newStatus: string
+  reason: string | null
+  changedBy: string | null
+  createdAt: string
 }
 
 interface ApiEnvelope<T> {
@@ -88,8 +140,18 @@ export function useUnits() {
     return res.data
   }
 
-  async function updateStatus(id: number, status: UnitStatus) {
-    const res = await api<ApiEnvelope<Unit>>(`/api/units/${id}/status`, { method: 'PUT', body: { status } })
+  async function updateOccupancyStatus(id: number, payload: UpdateOccupancyStatusPayload) {
+    const res = await api<ApiEnvelope<Unit>>(`/api/units/${id}/occupancy-status`, { method: 'PUT', body: payload })
+    return res.data
+  }
+
+  async function updateSaleStatus(id: number, payload: UpdateSaleStatusPayload) {
+    const res = await api<ApiEnvelope<Unit>>(`/api/units/${id}/sale-status`, { method: 'PUT', body: payload })
+    return res.data
+  }
+
+  async function getStatusHistory(id: number) {
+    const res = await api<ApiEnvelope<UnitStatusHistoryEntry[]>>(`/api/units/${id}/status-history`)
     return res.data
   }
 
@@ -97,5 +159,5 @@ export function useUnits() {
     await api(`/api/units/${id}`, { method: 'DELETE' })
   }
 
-  return { list, get, create, update, updateStatus, remove }
+  return { list, get, create, update, updateOccupancyStatus, updateSaleStatus, getStatusHistory, remove }
 }

@@ -4,8 +4,7 @@
 // refund is created PENDING, then a separate call marks it REFUNDED. List/get
 // are open to any authenticated user; create/process are ADMIN-only.
 
-export type RefundStatus = 'PENDING' | 'REFUNDED'
-export type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'CHECK' | 'ONLINE' | 'OTHER'
+import type { PaymentMethod, RefundStatus } from '#shared/domain'
 
 export interface Refund {
   id: number

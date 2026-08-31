@@ -3,8 +3,7 @@
 // sub-path). One plan per sale agreement; the schedule of installments is
 // generated separately once the plan exists.
 
-export type BillingCycle = 'MONTHLY' | 'QUARTERLY' | 'YEARLY'
-export type InstallmentStatus = 'PENDING' | 'PARTIALLY_PAID' | 'PAID'
+import type { BillingCycle, InstallmentStatus } from '#shared/domain'
 
 export interface PaymentPlan {
   id: number

@@ -5,8 +5,9 @@
 // (GET /api/loans/{id}/payments). Recording a payment against one installment
 // goes through useLoanInstallments.ts (LoanInstallmentController).
 
+import type { InstallmentStatus } from '#shared/domain'
+
 export type LoanStatus = 'ACTIVE' | 'CLOSED'
-export type InstallmentStatus = 'PENDING' | 'PARTIALLY_PAID' | 'PAID'
 
 export interface Loan {
   id: number

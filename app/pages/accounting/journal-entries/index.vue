@@ -273,7 +273,8 @@
 
 <script setup lang="ts">
 import type { ColumnDef, FieldDef } from '#shared/types'
-import type { JournalEntry, JournalEntryStatus, JournalSourceType } from '~/composables/useJournalEntries'
+import type { JournalEntry, JournalEntryStatus } from '~/composables/useJournalEntries'
+import type { JournalSourceType } from '#shared/domain'
 
 definePageMeta({ middleware: 'admin' })
 

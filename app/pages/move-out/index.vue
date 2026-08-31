@@ -255,7 +255,6 @@
 import type { ColumnDef, FieldDef } from '#shared/types'
 import type {
   CreateDamageChargePayload,
-  CreateInspectionPayload,
   CreateMoveOutPayload,
   DamageCharge,
   DepositSettlement,
@@ -264,6 +263,7 @@ import type {
   MoveOutStatus,
   UnitRelease
 } from '~/composables/useMoveOut'
+import type { CreateInspectionPayload } from '#shared/domain'
 
 const route = useRoute()
 const { isAdmin } = useAuth()

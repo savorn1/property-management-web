@@ -3,6 +3,8 @@
 // charges -> deposit settlement -> unit release. Reads are open to any
 // authenticated user; writes are ADMIN-only.
 
+import type { CreateInspectionPayload } from '#shared/domain'
+
 export type MoveOutStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED'
 export type SettlementStatus = 'PENDING' | 'SETTLED'
 
@@ -69,13 +71,6 @@ export interface MoveOutInspection {
   totalDamageCharges: number
   damageCharges: DamageCharge[]
   createdAt: string
-}
-
-export interface CreateInspectionPayload {
-  inspectionDate: string
-  inspectedBy: string
-  condition: 'EXCELLENT' | 'GOOD' | 'FAIR' | 'POOR'
-  notes?: string
 }
 
 export interface DepositSettlement {

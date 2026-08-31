@@ -62,11 +62,11 @@
       </UCard>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <StatTile label="Occupied" :value="fmt(occupancy?.occupiedUnits)" icon="i-lucide-door-closed" color="info" :loading="loading" to="/units?status=OCCUPIED" />
-        <StatTile label="Available" :value="fmt(occupancy?.availableUnits)" icon="i-lucide-check-circle" color="success" :loading="loading" to="/units?status=AVAILABLE" />
-        <StatTile label="Reserved" :value="fmt(occupancy?.reservedUnits)" icon="i-lucide-bookmark" color="warning" :loading="loading" to="/units?status=RESERVED" />
-        <StatTile label="Maintenance" :value="fmt(occupancy?.maintenanceUnits)" icon="i-lucide-wrench" color="warning" :loading="loading" to="/units?status=MAINTENANCE" />
-        <StatTile label="Blocked" :value="fmt(occupancy?.unavailableUnits)" icon="i-lucide-ban" color="neutral" :loading="loading" to="/units?status=UNAVAILABLE" />
+        <StatTile label="Occupied" :value="fmt(occupancy?.occupiedUnits)" icon="i-lucide-door-closed" color="info" :loading="loading" to="/units?occupancyStatus=OCCUPIED" />
+        <StatTile label="Available" :value="fmt(occupancy?.availableUnits)" icon="i-lucide-check-circle" color="success" :loading="loading" to="/units?occupancyStatus=VACANT" />
+        <StatTile label="Reserved" :value="fmt(occupancy?.reservedUnits)" icon="i-lucide-bookmark" color="warning" :loading="loading" to="/units?occupancyStatus=RESERVED" />
+        <StatTile label="Maintenance" :value="fmt(occupancy?.maintenanceUnits)" icon="i-lucide-wrench" color="warning" :loading="loading" to="/units?occupancyStatus=MAINTENANCE" />
+        <StatTile label="Blocked" :value="fmt(occupancy?.unavailableUnits)" icon="i-lucide-ban" color="neutral" :loading="loading" to="/units?occupancyStatus=UNAVAILABLE" />
         <StatTile label="Occupancy rate" :value="occupancyRateLabel" icon="i-lucide-percent" color="primary" :loading="loading" />
       </div>
     </section>
@@ -116,9 +116,21 @@
         <StatTile label="Buyers" :value="fmt(counts.buyers)" icon="i-lucide-handshake" :loading="loading" to="/buyers" />
         <StatTile label="Active reservations" :value="fmt(counts.activeReservations)" icon="i-lucide-bookmark" :loading="loading" to="/sale-reservations?status=ACTIVE" />
         <StatTile label="Active sale agreements" :value="fmt(counts.activeSaleAgreements)" icon="i-lucide-file-signature" :loading="loading" to="/sale-agreements?status=ACTIVE" />
-        <StatTile label="Sales collected" :sublabel="salesPeriodLabel" :value="fmtCurrency(revenue?.salesCollected)" icon="i-lucide-wallet" color="success" :loading="loading" />
+        <StatTile label="Sales collected" :sublabel="periodLabel" :value="fmtCurrency(revenue?.salesCollected)" icon="i-lucide-wallet" color="success" :loading="loading" />
         <StatTile label="Outstanding installments" :value="fmtCurrency(collections?.outstandingInstallmentAmount)" icon="i-lucide-hourglass" color="warning" :loading="loading" />
         <StatTile label="Overdue installments" :value="fmtCurrency(collections?.overdueInstallmentAmount)" icon="i-lucide-triangle-alert" color="warning" :loading="loading" />
+      </div>
+    </section>
+
+    <section>
+      <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+        Operations overview
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatTile label="Open maintenance requests" :value="fmt(counts.openMaintenanceRequests)" icon="i-lucide-wrench" color="warning" :loading="loading" to="/maintenance?status=OPEN" />
+        <StatTile label="Pending utility bills" :value="fmt(counts.pendingUtilityBills)" icon="i-lucide-zap" color="warning" :loading="loading" to="/utility-bills?status=PENDING" />
+        <StatTile label="Available parking spots" :value="fmt(counts.availableParkingSpots)" icon="i-lucide-square-parking" color="success" :loading="loading" to="/parking-spots?status=AVAILABLE" />
+        <StatTile label="Utility collected" :sublabel="periodLabel" :value="fmtCurrency(revenue?.utilityCollected)" icon="i-lucide-wallet" color="success" :loading="loading" />
       </div>
     </section>
   </div>
@@ -136,6 +148,9 @@ const { list: listLeases } = useLeases()
 const { list: listBuyers } = useBuyers()
 const { list: listSaleReservations } = useSaleReservations()
 const { list: listSaleAgreements } = useSaleAgreements()
+const { list: listMaintenance } = useMaintenance()
+const { list: listUtilityBills } = useUtilityBills()
+const { list: listParkingSpots } = useParkingSpots()
 const { getOccupancy, getCollections, getRevenue } = useReports()
 
 const loading = ref(true)
@@ -149,7 +164,10 @@ const counts = reactive({
   activeLeases: undefined as number | undefined,
   buyers: undefined as number | undefined,
   activeReservations: undefined as number | undefined,
-  activeSaleAgreements: undefined as number | undefined
+  activeSaleAgreements: undefined as number | undefined,
+  openMaintenanceRequests: undefined as number | undefined,
+  pendingUtilityBills: undefined as number | undefined,
+  availableParkingSpots: undefined as number | undefined
 })
 
 const occupancy = ref<OccupancyReport | null>(null)
@@ -201,7 +219,7 @@ function fmtCurrency(value: number | undefined) {
   return formatCurrency(value)
 }
 
-const salesPeriodLabel = 'This month'
+const periodLabel = 'This month'
 
 function monthRange() {
   const now = new Date()
@@ -224,6 +242,9 @@ async function load() {
       buyersRes,
       reservationsRes,
       saleAgreementsRes,
+      openMaintenanceRes,
+      pendingUtilityBillsRes,
+      availableParkingSpotsRes,
       occupancyRes,
       collectionsRes,
       revenueRes
@@ -236,6 +257,9 @@ async function load() {
       listBuyers({ size: 1 }),
       listSaleReservations({ status: 'ACTIVE', size: 1 }),
       listSaleAgreements({ status: 'ACTIVE', size: 1 }),
+      listMaintenance({ status: 'OPEN', size: 1 }),
+      listUtilityBills({ status: 'PENDING', size: 1 }),
+      listParkingSpots({ status: 'AVAILABLE', size: 1 }),
       getOccupancy(),
       getCollections(),
       getRevenue(startDate, endDate)
@@ -248,6 +272,9 @@ async function load() {
     counts.buyers = buyersRes.metadata.totalCount
     counts.activeReservations = reservationsRes.metadata.totalCount
     counts.activeSaleAgreements = saleAgreementsRes.metadata.totalCount
+    counts.openMaintenanceRequests = openMaintenanceRes.metadata.totalCount
+    counts.pendingUtilityBills = pendingUtilityBillsRes.metadata.totalCount
+    counts.availableParkingSpots = availableParkingSpotsRes.metadata.totalCount
     activeLeaseRows.value = leasesRes.data
     occupancy.value = occupancyRes
     collections.value = collectionsRes

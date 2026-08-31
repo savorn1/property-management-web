@@ -4,6 +4,8 @@
 // using this composable must gate those actions on useAuth().isAdmin
 // themselves rather than middleware, since viewing invoices is not admin-only.
 
+import type { Payment, PaymentMethod } from '#shared/domain'
+
 export type InvoiceStatus = 'PENDING' | 'PARTIALLY_PAID' | 'PAID' | 'CANCELLED'
 
 export interface Invoice {
@@ -48,22 +50,6 @@ export interface CreateInvoicePayload {
   billingPeriodEnd?: string
   dueDate?: string
   notes?: string
-}
-
-export type PaymentMethod = 'CASH' | 'BANK_TRANSFER' | 'CARD' | 'CHECK' | 'ONLINE' | 'OTHER'
-
-export interface Payment {
-  id: number
-  leaseId: number | null
-  invoiceId: number | null
-  type: string
-  amount: number
-  paymentDate: string
-  method: PaymentMethod
-  referenceNumber: string | null
-  notes: string | null
-  recordedBy: string | null
-  createdAt: string
 }
 
 export interface CreatePaymentPayload {

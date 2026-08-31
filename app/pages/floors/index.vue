@@ -13,6 +13,7 @@
           placeholder="Building"
           class="w-56"
         />
+        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-44" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -137,7 +138,7 @@
 
 <script setup lang="ts">
 import type { ColumnDef, FieldDef } from '#shared/types'
-import type { CreateFloorPayload, Floor, UpdateFloorPayload } from '~/composables/useFloors'
+import type { CreateFloorPayload, Floor, FloorStatus, UpdateFloorPayload } from '~/composables/useFloors'
 
 const route = useRoute()
 const { list, create, update, remove } = useFloors()
@@ -148,7 +149,19 @@ const loading = ref(false)
 const error = ref('')
 
 const initialBuildingId = Number(route.query.buildingId) || undefined
-const filter = reactive<{ buildingId: number | undefined }>({ buildingId: initialBuildingId })
+const initialStatus = (route.query.status as FloorStatus | undefined) || undefined
+const filter = reactive<{ buildingId: number | undefined; status: FloorStatus | undefined }>({
+  buildingId: initialBuildingId,
+  status: initialStatus
+})
+
+const STATUS_OPTIONS: { label: string; value: FloorStatus }[] = [
+  { label: 'Active', value: 'ACTIVE' },
+  { label: 'Under construction', value: 'UNDER_CONSTRUCTION' },
+  { label: 'Renovation', value: 'RENOVATION' },
+  { label: 'Inactive', value: 'INACTIVE' }
+]
+const statusFilterOptions = [{ label: 'All statuses', value: undefined }, ...STATUS_OPTIONS]
 
 const buildingOptions = ref<{ label: string; value: number }[]>([])
 const buildingFilterOptions = computed(() => [{ label: 'All buildings', value: undefined }, ...buildingOptions.value])
@@ -169,6 +182,7 @@ const columns: ColumnDef<Floor>[] = [
   { key: 'floorNumber', label: 'Floor #', sortable: true },
   { key: 'name', value: (row) => row.name ?? '—' },
   { key: 'buildingName', label: 'Building', value: (row) => row.buildingName ?? '—' },
+  { key: 'status', type: 'status' },
   { key: 'actions', label: '' }
 ]
 
@@ -178,6 +192,7 @@ async function load() {
   try {
     const res = await list({
       buildingId: filter.buildingId,
+      status: filter.status,
       sortBy: sort.value?.column,
       sortOrder: sort.value?.direction,
       size: 200
@@ -192,13 +207,15 @@ async function load() {
 
 const createFields = computed<FieldDef[]>(() => [
   { name: 'buildingId', label: 'Building', type: 'select', required: true, options: buildingOptions.value },
-  { name: 'floorNumber', label: 'Floor number', type: 'number', required: true },
+  { name: 'floorNumber', label: 'Floor number', type: 'number', required: true, wrapper: 'half' },
+  { name: 'status', type: 'select', options: STATUS_OPTIONS, wrapper: 'half' },
   { name: 'name' },
   { name: 'description', type: 'textarea', wrapper: 'full' }
 ])
 
 const editFields: FieldDef[] = [
-  { name: 'floorNumber', label: 'Floor number', type: 'number', required: true },
+  { name: 'floorNumber', label: 'Floor number', type: 'number', required: true, wrapper: 'half' },
+  { name: 'status', type: 'select', options: STATUS_OPTIONS, wrapper: 'half' },
   { name: 'name' },
   { name: 'description', type: 'textarea', wrapper: 'full' }
 ]
@@ -233,17 +250,20 @@ const {
     toForm: (row) => ({
       floorNumber: row.floorNumber,
       name: row.name ?? '',
+      status: row.status ?? undefined,
       description: row.description ?? ''
     }),
     toPayload: (values) => ({
       buildingId: values.buildingId,
       floorNumber: values.floorNumber,
       name: values.name || undefined,
+      status: values.status || undefined,
       description: values.description || undefined
     }),
     toEditPayload: (values) => ({
       floorNumber: values.floorNumber,
       name: values.name || undefined,
+      status: values.status || undefined,
       description: values.description || undefined
     })
   }
@@ -254,12 +274,13 @@ onMounted(async () => {
   await load()
 })
 watch(sort, load)
-watch(() => filter.buildingId, load)
+watch(() => [filter.buildingId, filter.status], load)
 
-const hasActiveFilter = computed(() => filter.buildingId !== undefined)
+const hasActiveFilter = computed(() => filter.buildingId !== undefined || filter.status !== undefined)
 
 function clearFilters() {
   filter.buildingId = undefined
+  filter.status = undefined
   load()
 }
 </script>

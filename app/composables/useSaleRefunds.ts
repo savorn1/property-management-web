@@ -4,7 +4,7 @@
 // from recorded payments minus deductions) as PENDING, `process` marks it
 // REFUNDED. Folded into the Sale Agreements "Manage" modal.
 
-export type RefundStatus = 'PENDING' | 'REFUNDED'
+import type { RefundStatus } from '#shared/domain'
 
 export interface SaleRefund {
   id: number

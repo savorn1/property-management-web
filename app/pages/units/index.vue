@@ -14,9 +14,15 @@
           class="w-56"
         />
         <USelect
-          v-model="filter.status"
-          :items="statusFilterOptions"
-          placeholder="Status"
+          v-model="filter.occupancyStatus"
+          :items="occupancyStatusFilterOptions"
+          placeholder="Occupancy"
+          class="w-40"
+        />
+        <USelect
+          v-model="filter.saleStatus"
+          :items="saleStatusFilterOptions"
+          placeholder="Sale status"
           class="w-40"
         />
         <UInput
@@ -67,10 +73,19 @@
               size="xs"
               color="neutral"
               variant="soft"
-              icon="i-lucide-refresh-cw-off"
-              @click="openStatusWith(row)"
+              icon="i-lucide-door-open"
+              @click="openOccupancyStatusWith(row)"
             >
-              Status
+              Occupancy
+            </UButton>
+            <UButton
+              size="xs"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-tag"
+              @click="openSaleStatusWith(row)"
+            >
+              Sale status
             </UButton>
             <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-pencil" @click="openEdit(row)">
               Edit
@@ -137,17 +152,32 @@
       </template>
     </UModal>
 
-    <UModal v-model:open="showStatus" :title="`Update status for unit '${statusTarget?.unitNumber ?? ''}'`">
+    <UModal v-model:open="showOccupancyStatus" :title="`Update occupancy status for unit '${occupancyStatusTarget?.unitNumber ?? ''}'`">
       <template #body>
         <DynamicForm
-          v-model="statusForm"
-          :fields="statusFields"
-          :loading="statusLoading"
-          :error="statusError"
+          v-model="occupancyStatusForm"
+          :fields="occupancyStatusFields"
+          :loading="occupancyStatusLoading"
+          :error="occupancyStatusError"
           submit-label="Update"
           cancelable
-          @submit="onStatusSubmit"
-          @cancel="showStatus = false"
+          @submit="onOccupancyStatusSubmit"
+          @cancel="showOccupancyStatus = false"
+        />
+      </template>
+    </UModal>
+
+    <UModal v-model:open="showSaleStatus" :title="`Update sale status for unit '${saleStatusTarget?.unitNumber ?? ''}'`">
+      <template #body>
+        <DynamicForm
+          v-model="saleStatusForm"
+          :fields="saleStatusFields"
+          :loading="saleStatusLoading"
+          :error="saleStatusError"
+          submit-label="Update"
+          cancelable
+          @submit="onSaleStatusSubmit"
+          @cancel="showSaleStatus = false"
         />
       </template>
     </UModal>
@@ -407,6 +437,28 @@
               @submit="onAddPrice"
             />
           </div>
+
+          <!-- Status history -->
+          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
+            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+              Status history
+            </h3>
+            <div v-if="statusHistoryLoading" class="text-sm text-gray-400">Loading…</div>
+            <div v-else-if="statusHistory.length === 0" class="text-sm text-gray-400">No status changes recorded yet.</div>
+            <div v-else class="space-y-1.5">
+              <div
+                v-for="h in statusHistory"
+                :key="h.id"
+                class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
+              >
+                <span class="text-gray-600 dark:text-gray-300">
+                  {{ formatEnum(h.statusField) }}: {{ h.previousStatus ? formatEnum(h.previousStatus) : '—' }} → {{ formatEnum(h.newStatus) }}
+                  <span v-if="h.reason" class="text-gray-400"> — {{ h.reason }}</span>
+                  <div class="text-xs text-gray-400">{{ formatDateTime(h.createdAt) }} · {{ h.changedBy ?? '—' }}</div>
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </template>
     </UModal>
@@ -426,7 +478,14 @@
 
 <script setup lang="ts">
 import type { ColumnDef, FieldDef } from '#shared/types'
-import type { CreateUnitPayload, Unit, UnitStatus, UpdateUnitPayload } from '~/composables/useUnits'
+import type {
+  CreateUnitPayload,
+  OccupancyStatus,
+  SaleStatus,
+  Unit,
+  UnitStatusHistoryEntry,
+  UpdateUnitPayload
+} from '~/composables/useUnits'
 import type { UnitAmenity } from '~/composables/useUnitAmenities'
 import type { UnitImage } from '~/composables/useUnitImages'
 import type { UnitCertificate } from '~/composables/useUnitCertificates'
@@ -436,7 +495,7 @@ import type { PriceType, UnitPrice } from '~/composables/useUnitPrices'
 
 const route = useRoute()
 const { isAdmin } = useAuth()
-const { list, create, update, updateStatus, remove } = useUnits()
+const { list, create, update, updateOccupancyStatus, updateSaleStatus, getStatusHistory, remove } = useUnits()
 const { list: listUnitTypes } = useUnitTypes()
 const { list: listAmenities } = useAmenities()
 const { list: listUnitAmenities, assign: assignUnitAmenity, remove: removeUnitAmenity } = useUnitAmenities()
@@ -468,25 +527,39 @@ const loading = ref(false)
 const error = ref('')
 
 const initialUnitTypeId = Number(route.query.unitTypeId) || undefined
-const initialStatus = (route.query.status as UnitStatus | undefined) || undefined
-const filter = reactive<{ unitTypeId: number | undefined; status: UnitStatus | undefined; unitNumber: string }>({
+const initialOccupancyStatus = (route.query.occupancyStatus as OccupancyStatus | undefined) || undefined
+const initialSaleStatus = (route.query.saleStatus as SaleStatus | undefined) || undefined
+const filter = reactive<{
+  unitTypeId: number | undefined
+  occupancyStatus: OccupancyStatus | undefined
+  saleStatus: SaleStatus | undefined
+  unitNumber: string
+}>({
   unitTypeId: initialUnitTypeId,
-  status: initialStatus,
+  occupancyStatus: initialOccupancyStatus,
+  saleStatus: initialSaleStatus,
   unitNumber: ''
 })
 
 const unitTypeOptions = ref<{ label: string; value: number }[]>([])
 const unitTypeFilterOptions = computed(() => [{ label: 'All unit types', value: undefined }, ...unitTypeOptions.value])
 
-const STATUS_OPTIONS: { label: string; value: UnitStatus }[] = [
-  { label: 'Available', value: 'AVAILABLE' },
+const OCCUPANCY_STATUS_OPTIONS: { label: string; value: OccupancyStatus }[] = [
+  { label: 'Vacant', value: 'VACANT' },
   { label: 'Occupied', value: 'OCCUPIED' },
   { label: 'Reserved', value: 'RESERVED' },
   { label: 'Maintenance', value: 'MAINTENANCE' },
-  { label: 'Unavailable', value: 'UNAVAILABLE' },
+  { label: 'Unavailable', value: 'UNAVAILABLE' }
+]
+const occupancyStatusFilterOptions = [{ label: 'All occupancy', value: undefined }, ...OCCUPANCY_STATUS_OPTIONS]
+
+const SALE_STATUS_OPTIONS: { label: string; value: SaleStatus }[] = [
+  { label: 'Not for sale', value: 'NOT_FOR_SALE' },
+  { label: 'For sale', value: 'FOR_SALE' },
+  { label: 'Reserved', value: 'RESERVED' },
   { label: 'Sold', value: 'SOLD' }
 ]
-const statusFilterOptions = [{ label: 'All statuses', value: undefined }, ...STATUS_OPTIONS]
+const saleStatusFilterOptions = [{ label: 'All sale statuses', value: undefined }, ...SALE_STATUS_OPTIONS]
 
 async function loadUnitTypeOptions() {
   const res = await listUnitTypes({ size: 200 })
@@ -507,7 +580,8 @@ const columns: ColumnDef<Unit>[] = [
   { key: 'unitNumber', label: 'Unit #', sortable: true },
   { key: 'unitTypeName', label: 'Unit type', value: (row) => row.unitTypeName ?? '—' },
   { key: 'buildingName', label: 'Building', value: (row) => row.buildingName ?? '—' },
-  { key: 'status', type: 'status' },
+  { key: 'occupancyStatus', label: 'Occupancy', type: 'status' },
+  { key: 'saleStatus', label: 'Sale status', type: 'status' },
   { key: 'actions', label: '' }
 ]
 
@@ -517,7 +591,8 @@ async function load() {
   try {
     const res = await list({
       unitTypeId: filter.unitTypeId,
-      status: filter.status,
+      occupancyStatus: filter.occupancyStatus,
+      saleStatus: filter.saleStatus,
       unitNumber: filter.unitNumber || undefined,
       sortBy: sort.value?.column,
       sortOrder: sort.value?.direction,
@@ -531,15 +606,42 @@ async function load() {
   }
 }
 
+const VIEW_OPTIONS = [
+  { label: 'City', value: 'CITY' },
+  { label: 'Garden', value: 'GARDEN' },
+  { label: 'Pool', value: 'POOL' },
+  { label: 'Sea', value: 'SEA' },
+  { label: 'Street', value: 'STREET' }
+]
+const ORIENTATION_OPTIONS = [
+  { label: 'North', value: 'NORTH' },
+  { label: 'South', value: 'SOUTH' },
+  { label: 'East', value: 'EAST' },
+  { label: 'West', value: 'WEST' }
+]
+
 const createFields = computed<FieldDef[]>(() => [
   { name: 'unitTypeId', label: 'Unit type', type: 'select', required: true, options: unitTypeOptions.value },
-  { name: 'unitNumber', label: 'Unit number', required: true },
-  { name: 'status', type: 'select', options: STATUS_OPTIONS, default: 'AVAILABLE' },
+  { name: 'unitNumber', label: 'Unit number', required: true, wrapper: 'half' },
+  { name: 'name', wrapper: 'half' },
+  { name: 'occupancyStatus', label: 'Occupancy status', type: 'select', options: OCCUPANCY_STATUS_OPTIONS, default: 'VACANT', wrapper: 'half' },
+  { name: 'saleStatus', label: 'Sale status', type: 'select', options: SALE_STATUS_OPTIONS, default: 'NOT_FOR_SALE', wrapper: 'half' },
+  { name: 'view', type: 'select', options: VIEW_OPTIONS, wrapper: 'half' },
+  { name: 'orientation', type: 'select', options: ORIENTATION_OPTIONS, wrapper: 'half' },
+  { name: 'kitchen', type: 'switch', onLabel: 'Yes', offLabel: 'No' },
+  { name: 'balcony', type: 'switch', onLabel: 'Yes', offLabel: 'No' },
+  { name: 'furnished', type: 'switch', onLabel: 'Yes', offLabel: 'No' },
   { name: 'description', type: 'textarea', wrapper: 'full' }
 ])
 
 const editFields: FieldDef[] = [
-  { name: 'unitNumber', label: 'Unit number', required: true },
+  { name: 'unitNumber', label: 'Unit number', required: true, wrapper: 'half' },
+  { name: 'name', wrapper: 'half' },
+  { name: 'view', type: 'select', options: VIEW_OPTIONS, wrapper: 'half' },
+  { name: 'orientation', type: 'select', options: ORIENTATION_OPTIONS, wrapper: 'half' },
+  { name: 'kitchen', type: 'switch', onLabel: 'Yes', offLabel: 'No' },
+  { name: 'balcony', type: 'switch', onLabel: 'Yes', offLabel: 'No' },
+  { name: 'furnished', type: 'switch', onLabel: 'Yes', offLabel: 'No' },
   { name: 'description', type: 'textarea', wrapper: 'full' }
 ]
 
@@ -569,54 +671,120 @@ const {
   load,
   {
     entityName: 'Unit',
-    createDefaults: () => ({ unitTypeId: filter.unitTypeId, status: 'AVAILABLE' }),
+    createDefaults: () => ({ unitTypeId: filter.unitTypeId, occupancyStatus: 'VACANT', saleStatus: 'NOT_FOR_SALE' }),
     toForm: (row) => ({
       unitNumber: row.unitNumber,
+      name: row.name ?? '',
+      view: row.view ?? undefined,
+      orientation: row.orientation ?? undefined,
+      kitchen: row.kitchen ?? false,
+      balcony: row.balcony ?? false,
+      furnished: row.furnished ?? false,
       description: row.description ?? ''
     }),
     toPayload: (values) => ({
       unitTypeId: values.unitTypeId,
       unitNumber: values.unitNumber,
-      status: values.status,
+      name: values.name || undefined,
+      occupancyStatus: values.occupancyStatus,
+      saleStatus: values.saleStatus,
+      view: values.view || undefined,
+      orientation: values.orientation || undefined,
+      kitchen: values.kitchen,
+      balcony: values.balcony,
+      furnished: values.furnished,
       description: values.description || undefined
     }),
     toEditPayload: (values) => ({
       unitNumber: values.unitNumber,
+      name: values.name || undefined,
+      view: values.view || undefined,
+      orientation: values.orientation || undefined,
+      kitchen: values.kitchen,
+      balcony: values.balcony,
+      furnished: values.furnished,
       description: values.description || undefined
     })
   }
 )
 
+// Occupancy status — its own endpoint, separate from sale status below.
 const {
-  open: showStatus,
-  target: statusTarget,
-  loading: statusLoading,
-  error: statusError,
-  openWith: openStatusWith
+  open: showOccupancyStatus,
+  target: occupancyStatusTarget,
+  loading: occupancyStatusLoading,
+  error: occupancyStatusError,
+  openWith: openOccupancyStatusWith
 } = useTargetModal<Unit>()
 
-const statusForm = ref<Record<string, any>>({})
-const statusFields: FieldDef[] = [{ name: 'status', type: 'select', required: true, options: STATUS_OPTIONS }]
+const occupancyStatusForm = ref<Record<string, any>>({})
+const occupancyStatusFields: FieldDef[] = [
+  { name: 'occupancyStatus', label: 'Occupancy status', type: 'select', required: true, options: OCCUPANCY_STATUS_OPTIONS },
+  { name: 'reason' }
+]
 
-watch(showStatus, (value) => {
-  if (value && statusTarget.value) {
-    statusForm.value = { status: statusTarget.value.status }
+watch(showOccupancyStatus, (value) => {
+  if (value && occupancyStatusTarget.value) {
+    occupancyStatusForm.value = { occupancyStatus: occupancyStatusTarget.value.occupancyStatus ?? undefined }
   }
 })
 
-async function onStatusSubmit(values: Record<string, any>) {
-  if (!statusTarget.value) return
-  statusLoading.value = true
-  statusError.value = ''
+async function onOccupancyStatusSubmit(values: Record<string, any>) {
+  if (!occupancyStatusTarget.value) return
+  occupancyStatusLoading.value = true
+  occupancyStatusError.value = ''
   try {
-    await updateStatus(statusTarget.value.id, values.status)
-    showStatus.value = false
-    toast.add({ title: 'Unit status updated', color: 'success' })
+    await updateOccupancyStatus(occupancyStatusTarget.value.id, {
+      occupancyStatus: values.occupancyStatus,
+      reason: values.reason || undefined
+    })
+    showOccupancyStatus.value = false
+    toast.add({ title: 'Occupancy status updated', color: 'success' })
     await load()
   } catch (err) {
-    statusError.value = apiErrorMessage(err)
+    occupancyStatusError.value = apiErrorMessage(err)
   } finally {
-    statusLoading.value = false
+    occupancyStatusLoading.value = false
+  }
+}
+
+// Sale status — its own endpoint, separate from occupancy status above.
+const {
+  open: showSaleStatus,
+  target: saleStatusTarget,
+  loading: saleStatusLoading,
+  error: saleStatusError,
+  openWith: openSaleStatusWith
+} = useTargetModal<Unit>()
+
+const saleStatusForm = ref<Record<string, any>>({})
+const saleStatusFields: FieldDef[] = [
+  { name: 'saleStatus', label: 'Sale status', type: 'select', required: true, options: SALE_STATUS_OPTIONS },
+  { name: 'reason' }
+]
+
+watch(showSaleStatus, (value) => {
+  if (value && saleStatusTarget.value) {
+    saleStatusForm.value = { saleStatus: saleStatusTarget.value.saleStatus ?? undefined }
+  }
+})
+
+async function onSaleStatusSubmit(values: Record<string, any>) {
+  if (!saleStatusTarget.value) return
+  saleStatusLoading.value = true
+  saleStatusError.value = ''
+  try {
+    await updateSaleStatus(saleStatusTarget.value.id, {
+      saleStatus: values.saleStatus,
+      reason: values.reason || undefined
+    })
+    showSaleStatus.value = false
+    toast.add({ title: 'Sale status updated', color: 'success' })
+    await load()
+  } catch (err) {
+    saleStatusError.value = apiErrorMessage(err)
+  } finally {
+    saleStatusLoading.value = false
   }
 }
 
@@ -625,15 +793,20 @@ onMounted(async () => {
   await load()
 })
 watch(sort, load)
-watch(() => [filter.unitTypeId, filter.status], load)
+watch(() => [filter.unitTypeId, filter.occupancyStatus, filter.saleStatus], load)
 
 const hasActiveFilter = computed(
-  () => filter.unitTypeId !== undefined || filter.status !== undefined || filter.unitNumber !== ''
+  () =>
+    filter.unitTypeId !== undefined ||
+    filter.occupancyStatus !== undefined ||
+    filter.saleStatus !== undefined ||
+    filter.unitNumber !== ''
 )
 
 function clearFilters() {
   filter.unitTypeId = undefined
-  filter.status = undefined
+  filter.occupancyStatus = undefined
+  filter.saleStatus = undefined
   filter.unitNumber = ''
   load()
 }
@@ -988,6 +1161,20 @@ async function onAddPrice(values: Record<string, any>) {
   }
 }
 
+// Status history — read-only, populated from the same dedicated endpoint the
+// occupancy/sale status updates above write to.
+const statusHistory = ref<UnitStatusHistoryEntry[]>([])
+const statusHistoryLoading = ref(false)
+
+async function loadStatusHistorySection(unitId: number) {
+  statusHistoryLoading.value = true
+  try {
+    statusHistory.value = await getStatusHistory(unitId)
+  } finally {
+    statusHistoryLoading.value = false
+  }
+}
+
 watch(showManage, async (value) => {
   if (!value || !manageTarget.value) return
   const unitId = manageTarget.value.id
@@ -1018,7 +1205,8 @@ watch(showManage, async (value) => {
     loadCertificatesSection(unitId),
     loadDocumentsSection(unitId),
     loadOwnersSection(unitId),
-    loadPricesSection(unitId)
+    loadPricesSection(unitId),
+    loadStatusHistorySection(unitId)
   ])
 })
 </script>

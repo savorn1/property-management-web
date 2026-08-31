@@ -1,5 +1,11 @@
 // Wraps the backend's BuildingController (/api/buildings). Every building
 // belongs to a property.
+//
+// NOTE: `status` isn't a real backend field yet — same situation as
+// PropertyType in useProperties.ts. It'll round-trip as undefined until the
+// backend adds a matching column.
+
+export type BuildingStatus = 'ACTIVE' | 'UNDER_CONSTRUCTION' | 'RENOVATION' | 'INACTIVE'
 
 export interface Building {
   id: number
@@ -9,6 +15,7 @@ export interface Building {
   code: string | null
   totalFloors: number | null
   description: string | null
+  status: BuildingStatus | null
   createdAt: string
   updatedAt: string
 }
@@ -16,6 +23,7 @@ export interface Building {
 export interface BuildingFilter {
   propertyId?: number
   name?: string
+  status?: BuildingStatus
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
   page?: number
@@ -28,6 +36,7 @@ export interface CreateBuildingPayload {
   code?: string
   totalFloors?: number
   description?: string
+  status?: BuildingStatus
 }
 
 export interface UpdateBuildingPayload {
@@ -35,6 +44,7 @@ export interface UpdateBuildingPayload {
   code?: string
   totalFloors?: number
   description?: string
+  status?: BuildingStatus
 }
 
 interface ApiEnvelope<T> {

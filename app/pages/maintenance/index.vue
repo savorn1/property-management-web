@@ -274,6 +274,7 @@ import type {
 import type { CreateMaintenanceCostPayload, MaintenanceCost } from '~/composables/useMaintenanceCosts'
 import type { CreateSparePartUsagePayload, SparePartUsageEntry } from '~/composables/useSparePartUsage'
 
+const route = useRoute()
 const { isAdmin } = useAuth()
 const { list, create, assign, updateStatus, updateCost, history } = useMaintenance()
 const { list: listCosts, create: createCost } = useMaintenanceCosts()
@@ -289,13 +290,14 @@ const rows = ref<MaintenanceRequestItem[]>([])
 const loading = ref(false)
 const error = ref('')
 
+const initialStatus = (route.query.status as MaintenanceStatus | undefined) || undefined
 const filter = reactive<{
   unitId: number | undefined
   status: MaintenanceStatus | undefined
   priority: MaintenancePriority | undefined
 }>({
   unitId: undefined,
-  status: undefined,
+  status: initialStatus,
   priority: undefined
 })
 

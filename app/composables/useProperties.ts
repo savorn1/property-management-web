@@ -1,10 +1,26 @@
 // Wraps the backend's PropertyController (/api/properties). Properties are
 // the top of the rentals hierarchy: Property -> Building -> Floor -> UnitType -> Unit.
+// Field shapes here (including `type` and `zoneId`) are verified against the
+// live backend's /v3/api-docs, not guessed.
+
+export type PropertyType =
+  | 'APARTMENT'
+  | 'CONDOMINIUM'
+  | 'OFFICE'
+  | 'SHOPPING_MALL'
+  | 'WAREHOUSE'
+  | 'VILLA'
+  | 'HOUSE'
+  | 'LAND'
+  | 'MIXED_USE'
 
 export interface PropertyItem {
   id: number
   name: string
   code: string | null
+  type: PropertyType | null
+  zoneId: number | null
+  zoneName: string | null
   address: string | null
   city: string | null
   state: string | null
@@ -19,6 +35,8 @@ export interface PropertyFilter {
   name?: string
   code?: string
   city?: string
+  type?: PropertyType
+  zoneId?: number
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
   page?: number
@@ -27,7 +45,9 @@ export interface PropertyFilter {
 
 export interface PropertyPayload {
   name: string
+  type: PropertyType
   code?: string
+  zoneId?: number
   address?: string
   city?: string
   state?: string
