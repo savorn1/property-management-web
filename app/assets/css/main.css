@@ -1,0 +1,12 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+/* Default body text was resetting to the browser's normal (400) weight —
+   bumping the base to medium (500) makes body copy read heavier everywhere
+   without touching every component; explicit font-weight utilities
+   (font-semibold, font-bold, etc.) still win since utilities load after base. */
+@layer base {
+  body {
+    font-weight: 500;
+  }
+}
