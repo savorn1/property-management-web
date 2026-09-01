@@ -68,8 +68,11 @@
             >
               Floors
             </UButton>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-settings-2" @click.stop="openManageWith(row)">
-              Manage
+            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-sparkles" @click.stop="openFacilitiesWith(row)">
+              Facilities
+            </UButton>
+            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-file-text" @click.stop="openDocumentsWith(row)">
+              Documents
             </UButton>
             <UButton size="xs" color="primary" variant="soft" icon="i-lucide-pencil" @click.stop="openEdit(row)">
               Edit
@@ -144,86 +147,71 @@
       @confirm="onDelete"
     />
 
-    <UModal v-model:open="showManage" :title="`Manage · ${manageTarget?.name ?? ''}`" :ui="{ content: 'sm:max-w-2xl' }">
+    <UModal v-model:open="showFacilities" :title="`Facilities · ${facilitiesTarget?.name ?? ''}`">
       <template #body>
-        <div class="space-y-6">
-          <div>
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Facilities
-            </h3>
-            <div v-if="facilitiesLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="facilities.length === 0" class="text-sm text-gray-400 mb-3">No facilities assigned.</div>
-            <div v-else class="space-y-1.5 mb-4">
-              <div
-                v-for="f in facilities"
-                :key="f.id"
-                class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
-              >
-                <span class="text-gray-600 dark:text-gray-300">
-                  {{ f.amenityName }}
-                  <span v-if="f.amenityCategory" class="text-gray-400">({{ f.amenityCategory }})</span>
-                  <span v-if="f.notes" class="text-gray-400"> — {{ f.notes }}</span>
-                </span>
-                <UButton
-                  v-if="isAdmin"
-                  size="xs"
-                  color="error"
-                  variant="ghost"
-                  icon="i-lucide-trash-2"
-                  @click="onRemoveFacility(f)"
-                />
-              </div>
-            </div>
-            <DynamicForm
+        <div v-if="facilitiesLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="facilities.length === 0" class="text-sm text-gray-400 mb-3">No facilities assigned.</div>
+        <div v-else class="space-y-1.5 mb-4">
+          <div
+            v-for="f in facilities"
+            :key="f.id"
+            class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
+          >
+            <span class="text-gray-600 dark:text-gray-300">
+              {{ f.amenityName }}
+              <span v-if="f.amenityCategory" class="text-gray-400">({{ f.amenityCategory }})</span>
+              <span v-if="f.notes" class="text-gray-400"> — {{ f.notes }}</span>
+            </span>
+            <UButton
               v-if="isAdmin"
-              v-model="assignFacilityForm"
-              :fields="assignFacilityFields"
-              :loading="assigningFacility"
-              :error="assignFacilityError"
-              submit-label="Assign"
-              @submit="onAssignFacility"
+              size="xs"
+              color="error"
+              variant="ghost"
+              icon="i-lucide-trash-2"
+              @click="onRemoveFacility(f)"
             />
           </div>
+        </div>
+        <DynamicForm
+          v-if="isAdmin"
+          v-model="assignFacilityForm"
+          :fields="assignFacilityFields"
+          :loading="assigningFacility"
+          :error="assignFacilityError"
+          submit-label="Assign"
+          @submit="onAssignFacility"
+        />
+      </template>
+    </UModal>
 
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Documents
-            </h3>
-            <div v-if="documentsLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="documents.length === 0" class="text-sm text-gray-400 mb-3">
-              No documents uploaded yet.
+    <UModal v-model:open="showDocuments" :title="`Documents · ${documentsTarget?.name ?? ''}`">
+      <template #body>
+        <div v-if="documentsLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="documents.length === 0" class="text-sm text-gray-400 mb-3">
+          No documents uploaded yet.
+        </div>
+        <div v-else class="space-y-1.5 mb-4">
+          <div
+            v-for="d in documents"
+            :key="d.id"
+            class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
+          >
+            <div>
+              <button class="text-primary-500 hover:underline text-left" @click="onDownloadDocument(d)">{{ d.fileName }}</button>
+              <span v-if="d.description" class="text-gray-400"> — {{ d.description }}</span>
+              <div class="text-xs text-gray-400">{{ formatDateTime(d.createdAt) }} · {{ d.uploadedBy ?? '—' }}</div>
             </div>
-            <div v-else class="space-y-1.5 mb-4">
-              <div
-                v-for="d in documents"
-                :key="d.id"
-                class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
-              >
-                <div>
-                  <button class="text-primary-500 hover:underline text-left" @click="onDownloadDocument(d)">{{ d.fileName }}</button>
-                  <span v-if="d.description" class="text-gray-400"> — {{ d.description }}</span>
-                  <div class="text-xs text-gray-400">{{ formatDateTime(d.createdAt) }} · {{ d.uploadedBy ?? '—' }}</div>
-                </div>
-                <UButton
-                  v-if="isAdmin"
-                  size="xs"
-                  color="error"
-                  variant="ghost"
-                  icon="i-lucide-trash-2"
-                  @click="onDeleteDocument(d)"
-                />
-              </div>
-            </div>
-            <div v-if="isAdmin" class="space-y-3">
-              <input ref="documentFileInput" type="file" class="text-sm" @change="onDocumentFileChange" />
-              <UInput v-model="documentUploadDescription" placeholder="Description (optional)" class="w-full" />
-              <UAlert v-if="documentUploadError" color="error" variant="subtle" :title="documentUploadError" />
-              <UButton :loading="documentUploading" :disabled="!selectedDocumentFile" icon="i-lucide-upload" @click="onUploadDocument">
-                Upload
-              </UButton>
-            </div>
+            <UButton
+              v-if="isAdmin"
+              size="xs"
+              color="error"
+              variant="ghost"
+              icon="i-lucide-trash-2"
+              @click="onDeleteDocument(d)"
+            />
           </div>
         </div>
+        <FileUploadField v-if="isAdmin" :upload="uploadDocumentForTarget" @uploaded="onDocumentUploaded" />
       </template>
     </UModal>
   </div>
@@ -388,7 +376,9 @@ function openCreate() {
 
 // Facilities — a Building's own list of assigned Amenity catalog items
 // (see useBuildingFacilities.ts), separate from any per-unit UnitAmenity.
-const { open: showManage, target: manageTarget, openWith: openManageWith } = useTargetModal<Building>()
+// Its own modal (was nested inside a shared "Manage" modal with Documents —
+// split so each is a focused, single-purpose action).
+const { open: showFacilities, target: facilitiesTarget, openWith: openFacilitiesWith } = useTargetModal<Building>()
 const facilities = ref<BuildingFacility[]>([])
 const facilitiesLoading = ref(false)
 const amenityOptions = ref<{ label: string; value: number }[]>([])
@@ -410,14 +400,14 @@ async function loadFacilitiesSection(buildingId: number) {
 }
 
 async function onAssignFacility(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!facilitiesTarget.value) return
   assigningFacility.value = true
   assignFacilityError.value = ''
   try {
-    await assignFacility(manageTarget.value.id, { amenityId: values.amenityId, notes: values.notes || undefined })
+    await assignFacility(facilitiesTarget.value.id, { amenityId: values.amenityId, notes: values.notes || undefined })
     assignFacilityForm.value = {}
     toast.add({ title: 'Facility assigned', color: 'success' })
-    await loadFacilitiesSection(manageTarget.value.id)
+    await loadFacilitiesSection(facilitiesTarget.value.id)
   } catch (err) {
     assignFacilityError.value = apiErrorMessage(err)
   } finally {
@@ -426,24 +416,32 @@ async function onAssignFacility(values: Record<string, any>) {
 }
 
 async function onRemoveFacility(row: BuildingFacility) {
-  if (!manageTarget.value) return
+  if (!facilitiesTarget.value) return
   try {
-    await removeFacility(manageTarget.value.id, row.id)
+    await removeFacility(facilitiesTarget.value.id, row.id)
     toast.add({ title: 'Facility removed', color: 'success' })
-    await loadFacilitiesSection(manageTarget.value.id)
+    await loadFacilitiesSection(facilitiesTarget.value.id)
   } catch (err) {
     toast.add({ title: 'Could not remove facility', description: apiErrorMessage(err), color: 'error' })
   }
 }
 
-// Documents — mirrors properties/index.vue's Documents section.
+watch(showFacilities, async (value) => {
+  if (!value || !facilitiesTarget.value) return
+  assignFacilityForm.value = {}
+  assignFacilityError.value = ''
+
+  const amenitiesRes = await listAmenities({ size: 200 })
+  amenityOptions.value = amenitiesRes.data.map((a) => ({ label: a.name, value: a.id }))
+
+  await loadFacilitiesSection(facilitiesTarget.value.id)
+})
+
+// Documents — mirrors properties/index.vue's Documents section. Its own
+// modal, same reasoning as Facilities above.
+const { open: showDocuments, target: documentsTarget, openWith: openDocumentsWith } = useTargetModal<Building>()
 const documents = ref<BuildingDocument[]>([])
 const documentsLoading = ref(false)
-const selectedDocumentFile = ref<File | null>(null)
-const documentUploadDescription = ref('')
-const documentUploading = ref(false)
-const documentUploadError = ref('')
-const documentFileInput = ref<HTMLInputElement | null>(null)
 
 async function loadDocuments(buildingId: number) {
   documentsLoading.value = true
@@ -456,63 +454,39 @@ async function loadDocuments(buildingId: number) {
   }
 }
 
-function onDocumentFileChange(e: Event) {
-  const target = e.target as HTMLInputElement
-  selectedDocumentFile.value = target.files?.[0] ?? null
+function uploadDocumentForTarget(file: File, description?: string) {
+  return uploadDocument(documentsTarget.value!.id, file, description)
 }
 
-async function onUploadDocument() {
-  if (!manageTarget.value || !selectedDocumentFile.value) return
-  documentUploading.value = true
-  documentUploadError.value = ''
-  try {
-    await uploadDocument(manageTarget.value.id, selectedDocumentFile.value, documentUploadDescription.value || undefined)
-    selectedDocumentFile.value = null
-    documentUploadDescription.value = ''
-    if (documentFileInput.value) documentFileInput.value.value = ''
-    toast.add({ title: 'Document uploaded', color: 'success' })
-    await loadDocuments(manageTarget.value.id)
-  } catch (err) {
-    documentUploadError.value = apiErrorMessage(err)
-  } finally {
-    documentUploading.value = false
-  }
+async function onDocumentUploaded() {
+  if (!documentsTarget.value) return
+  toast.add({ title: 'Document uploaded', color: 'success' })
+  await loadDocuments(documentsTarget.value.id)
 }
 
 async function onDeleteDocument(doc: BuildingDocument) {
-  if (!manageTarget.value) return
+  if (!documentsTarget.value) return
   try {
-    await removeDocument(manageTarget.value.id, doc.id)
+    await removeDocument(documentsTarget.value.id, doc.id)
     toast.add({ title: 'Document deleted', color: 'success' })
-    await loadDocuments(manageTarget.value.id)
+    await loadDocuments(documentsTarget.value.id)
   } catch (err) {
     toast.add({ title: 'Could not delete document', description: apiErrorMessage(err), color: 'error' })
   }
 }
 
 async function onDownloadDocument(doc: BuildingDocument) {
-  if (!manageTarget.value) return
+  if (!documentsTarget.value) return
   try {
-    await downloadDocument(manageTarget.value.id, doc.id, doc.fileName)
+    await downloadDocument(documentsTarget.value.id, doc.id, doc.fileName)
   } catch (err) {
     toast.add({ title: 'Could not download document', description: apiErrorMessage(err), color: 'error' })
   }
 }
 
-watch(showManage, async (value) => {
-  if (!value || !manageTarget.value) return
-  const buildingId = manageTarget.value.id
-
-  assignFacilityForm.value = {}
-  assignFacilityError.value = ''
-  selectedDocumentFile.value = null
-  documentUploadDescription.value = ''
-  documentUploadError.value = ''
-
-  const amenitiesRes = await listAmenities({ size: 200 })
-  amenityOptions.value = amenitiesRes.data.map((a) => ({ label: a.name, value: a.id }))
-
-  await Promise.all([loadFacilitiesSection(buildingId), loadDocuments(buildingId)])
+watch(showDocuments, async (value) => {
+  if (!value || !documentsTarget.value) return
+  await loadDocuments(documentsTarget.value.id)
 })
 
 onMounted(async () => {

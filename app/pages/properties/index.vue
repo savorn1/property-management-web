@@ -161,6 +161,53 @@
         <div class="space-y-6">
           <div>
             <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+              Images
+            </h3>
+            <div v-if="imagesLoading" class="text-sm text-gray-400">Loading…</div>
+            <div v-else-if="images.length === 0" class="text-sm text-gray-400 mb-3">No images uploaded yet.</div>
+            <div v-else class="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-4">
+              <div v-for="img in images" :key="img.id" class="relative group">
+                <img
+                  v-if="imageUrls[img.id]"
+                  :src="imageUrls[img.id]"
+                  :alt="img.caption ?? img.fileName"
+                  class="w-full h-20 object-cover rounded border border-gray-200 dark:border-gray-800 cursor-pointer"
+                  @click="openImageLightbox(img.id)"
+                >
+                <div v-else class="w-full h-20 rounded border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-300">
+                  <UIcon name="i-lucide-image" class="size-5" />
+                </div>
+                <span
+                  v-if="img.primary"
+                  class="absolute top-1 left-1 bg-primary-500 text-white text-[10px] px-1.5 py-0.5 rounded"
+                >
+                  Primary
+                </span>
+                <div v-if="isAdmin" class="absolute inset-x-0 bottom-0 flex justify-center gap-1 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity py-1">
+                  <UButton
+                    v-if="!img.primary"
+                    size="xs"
+                    color="neutral"
+                    variant="solid"
+                    icon="i-lucide-star"
+                    @click="onSetPrimaryImage(img)"
+                  />
+                  <UButton
+                    size="xs"
+                    color="error"
+                    variant="solid"
+                    icon="i-lucide-trash-2"
+                    @click="onDeleteImage(img)"
+                  />
+                </div>
+              </div>
+            </div>
+            <ImageUploadCropField v-if="isAdmin" :upload="uploadImageForTarget" @uploaded="onImageUploaded" />
+            <ImageLightbox v-model:open="showImageLightbox" v-model:index="imageLightboxIndex" :images="imageLightboxItems" />
+          </div>
+
+          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
+            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
               Documents
             </h3>
             <div v-if="documentsLoading" class="text-sm text-gray-400">Loading…</div>
@@ -188,14 +235,7 @@
                 />
               </div>
             </div>
-            <div v-if="isAdmin" class="space-y-3">
-              <input ref="documentFileInput" type="file" class="text-sm" @change="onDocumentFileChange" />
-              <UInput v-model="documentUploadDescription" placeholder="Description (optional)" class="w-full" />
-              <UAlert v-if="documentUploadError" color="error" variant="subtle" :title="documentUploadError" />
-              <UButton :loading="documentUploading" :disabled="!selectedDocumentFile" icon="i-lucide-upload" @click="onUploadDocument">
-                Upload
-              </UButton>
-            </div>
+            <FileUploadField v-if="isAdmin" :upload="uploadDocumentForTarget" @uploaded="onDocumentUploaded" />
           </div>
 
           <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
@@ -227,14 +267,7 @@
                 />
               </div>
             </div>
-            <div v-if="isAdmin" class="space-y-3">
-              <input ref="certificateFileInput" type="file" class="text-sm" @change="onCertificateFileChange" />
-              <UInput v-model="certificateUploadDescription" placeholder="Description (optional)" class="w-full" />
-              <UAlert v-if="certificateUploadError" color="error" variant="subtle" :title="certificateUploadError" />
-              <UButton :loading="certificateUploading" :disabled="!selectedCertificateFile" icon="i-lucide-upload" @click="onUploadCertificate">
-                Upload
-              </UButton>
-            </div>
+            <FileUploadField v-if="isAdmin" :upload="uploadCertificateForTarget" @uploaded="onCertificateUploaded" />
           </div>
         </div>
       </template>
@@ -247,10 +280,18 @@ import type { ColumnDef, FieldDef } from '#shared/types'
 import type { PropertyItem, PropertyPayload, PropertyType } from '~/composables/useProperties'
 import type { PropertyDocument } from '~/composables/usePropertyDocuments'
 import type { PropertyCertificate } from '~/composables/usePropertyCertificates'
+import type { PropertyImage } from '~/composables/usePropertyImages'
 
 const { list, create, update, remove } = useProperties()
 const { list: listDocuments, upload: uploadDocument, remove: removeDocument, download: downloadDocument } = usePropertyDocuments()
 const { list: listCertificates, upload: uploadCertificate, remove: removeCertificate, download: downloadCertificate } = usePropertyCertificates()
+const {
+  list: listImages,
+  upload: uploadImage,
+  setPrimary: setPrimaryImage,
+  remove: removeImage,
+  getObjectUrl: getImageUrl
+} = usePropertyImages()
 const { list: listZones } = useZones()
 const { isAdmin } = useAuth()
 const toast = useToast()
@@ -412,30 +453,87 @@ function clearFilters() {
   load()
 }
 
-// Manage — Documents + Certificates, both scoped to one property.
+// Manage — Images + Documents + Certificates, all scoped to one property.
 const {
   open: showManage,
   target: manageTarget,
   openWith: openManageWith
 } = useTargetModal<PropertyItem>()
 
+// Images
+const images = ref<PropertyImage[]>([])
+const imagesLoading = ref(false)
+const imageUrls = ref<Record<number, string>>({})
+
+async function loadImages() {
+  if (!manageTarget.value) return
+  imagesLoading.value = true
+  try {
+    images.value = await listImages(manageTarget.value.id)
+    for (const url of Object.values(imageUrls.value)) URL.revokeObjectURL(url)
+    const urls: Record<number, string> = {}
+    for (const img of images.value) {
+      urls[img.id] = await getImageUrl(manageTarget.value.id, img.id)
+    }
+    imageUrls.value = urls
+  } finally {
+    imagesLoading.value = false
+  }
+}
+
+function uploadImageForTarget(file: File, caption?: string, primary?: boolean) {
+  return uploadImage(manageTarget.value!.id, file, caption, primary)
+}
+
+const showImageLightbox = ref(false)
+const imageLightboxIndex = ref(0)
+const imageLightboxItems = computed(() =>
+  images.value
+    .filter((img) => imageUrls.value[img.id])
+    .map((img) => ({ id: img.id, url: imageUrls.value[img.id]!, fileName: img.fileName, caption: img.caption }))
+)
+
+function openImageLightbox(imageId: number) {
+  const index = imageLightboxItems.value.findIndex((img) => img.id === imageId)
+  if (index === -1) return
+  imageLightboxIndex.value = index
+  showImageLightbox.value = true
+}
+
+async function onImageUploaded() {
+  toast.add({ title: 'Image uploaded', color: 'success' })
+  await loadImages()
+}
+
+async function onSetPrimaryImage(img: PropertyImage) {
+  if (!manageTarget.value) return
+  try {
+    await setPrimaryImage(manageTarget.value.id, img.id)
+    toast.add({ title: 'Primary image updated', color: 'success' })
+    await loadImages()
+  } catch (err) {
+    toast.add({ title: 'Could not set primary image', description: apiErrorMessage(err), color: 'error' })
+  }
+}
+
+async function onDeleteImage(img: PropertyImage) {
+  if (!manageTarget.value) return
+  try {
+    await removeImage(manageTarget.value.id, img.id)
+    toast.add({ title: 'Image deleted', color: 'success' })
+    await loadImages()
+  } catch (err) {
+    toast.add({ title: 'Could not delete image', description: apiErrorMessage(err), color: 'error' })
+  }
+}
+
 // Documents
 const documents = ref<PropertyDocument[]>([])
 const documentsLoading = ref(false)
-const selectedDocumentFile = ref<File | null>(null)
-const documentUploadDescription = ref('')
-const documentUploading = ref(false)
-const documentUploadError = ref('')
-const documentFileInput = ref<HTMLInputElement | null>(null)
 
 // Certificates
 const certificates = ref<PropertyCertificate[]>([])
 const certificatesLoading = ref(false)
-const selectedCertificateFile = ref<File | null>(null)
-const certificateUploadDescription = ref('')
-const certificateUploading = ref(false)
-const certificateUploadError = ref('')
-const certificateFileInput = ref<HTMLInputElement | null>(null)
 
 async function loadDocuments() {
   if (!manageTarget.value) return
@@ -463,37 +561,18 @@ async function loadCertificates() {
 
 watch(showManage, (value) => {
   if (!value) return
-  selectedDocumentFile.value = null
-  documentUploadDescription.value = ''
-  documentUploadError.value = ''
-  selectedCertificateFile.value = null
-  certificateUploadDescription.value = ''
-  certificateUploadError.value = ''
+  loadImages()
   loadDocuments()
   loadCertificates()
 })
 
-function onDocumentFileChange(e: Event) {
-  const target = e.target as HTMLInputElement
-  selectedDocumentFile.value = target.files?.[0] ?? null
+function uploadDocumentForTarget(file: File, description?: string) {
+  return uploadDocument(manageTarget.value!.id, file, description)
 }
 
-async function onUploadDocument() {
-  if (!manageTarget.value || !selectedDocumentFile.value) return
-  documentUploading.value = true
-  documentUploadError.value = ''
-  try {
-    await uploadDocument(manageTarget.value.id, selectedDocumentFile.value, documentUploadDescription.value || undefined)
-    selectedDocumentFile.value = null
-    documentUploadDescription.value = ''
-    if (documentFileInput.value) documentFileInput.value.value = ''
-    toast.add({ title: 'Document uploaded', color: 'success' })
-    await loadDocuments()
-  } catch (err) {
-    documentUploadError.value = apiErrorMessage(err)
-  } finally {
-    documentUploading.value = false
-  }
+async function onDocumentUploaded() {
+  toast.add({ title: 'Document uploaded', color: 'success' })
+  await loadDocuments()
 }
 
 async function onDeleteDocument(doc: PropertyDocument) {
@@ -516,27 +595,13 @@ async function onDownloadDocument(doc: PropertyDocument) {
   }
 }
 
-function onCertificateFileChange(e: Event) {
-  const target = e.target as HTMLInputElement
-  selectedCertificateFile.value = target.files?.[0] ?? null
+function uploadCertificateForTarget(file: File, description?: string) {
+  return uploadCertificate(manageTarget.value!.id, file, description)
 }
 
-async function onUploadCertificate() {
-  if (!manageTarget.value || !selectedCertificateFile.value) return
-  certificateUploading.value = true
-  certificateUploadError.value = ''
-  try {
-    await uploadCertificate(manageTarget.value.id, selectedCertificateFile.value, certificateUploadDescription.value || undefined)
-    selectedCertificateFile.value = null
-    certificateUploadDescription.value = ''
-    if (certificateFileInput.value) certificateFileInput.value.value = ''
-    toast.add({ title: 'Certificate uploaded', color: 'success' })
-    await loadCertificates()
-  } catch (err) {
-    certificateUploadError.value = apiErrorMessage(err)
-  } finally {
-    certificateUploading.value = false
-  }
+async function onCertificateUploaded() {
+  toast.add({ title: 'Certificate uploaded', color: 'success' })
+  await loadCertificates()
 }
 
 async function onDeleteCertificate(cert: PropertyCertificate) {

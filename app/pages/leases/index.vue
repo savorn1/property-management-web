@@ -240,14 +240,7 @@
               </div>
             </div>
 
-            <div v-if="isAdmin" class="space-y-3">
-              <input ref="documentFileInput" type="file" class="text-sm" @change="onDocumentFileChange" />
-              <UInput v-model="documentUploadDescription" placeholder="Description (optional)" class="w-full" />
-              <UAlert v-if="documentUploadError" color="error" variant="subtle" :title="documentUploadError" />
-              <UButton :loading="documentUploading" :disabled="!selectedDocumentFile" icon="i-lucide-upload" @click="onUploadDocument">
-                Upload
-              </UButton>
-            </div>
+            <FileUploadField v-if="isAdmin" :upload="uploadDocumentForTarget" @uploaded="onDocumentUploaded" />
           </div>
         </div>
       </template>
@@ -551,11 +544,6 @@ const depositFields: FieldDef[] = [
 
 const documents = ref<LeaseDocument[]>([])
 const documentsLoading = ref(false)
-const selectedDocumentFile = ref<File | null>(null)
-const documentUploadDescription = ref('')
-const documentUploading = ref(false)
-const documentUploadError = ref('')
-const documentFileInput = ref<HTMLInputElement | null>(null)
 
 async function loadDocuments() {
   if (!manageTarget.value) return
@@ -569,27 +557,13 @@ async function loadDocuments() {
   }
 }
 
-function onDocumentFileChange(e: Event) {
-  const target = e.target as HTMLInputElement
-  selectedDocumentFile.value = target.files?.[0] ?? null
+function uploadDocumentForTarget(file: File, description?: string) {
+  return uploadDocument(manageTarget.value!.id, file, description)
 }
 
-async function onUploadDocument() {
-  if (!manageTarget.value || !selectedDocumentFile.value) return
-  documentUploading.value = true
-  documentUploadError.value = ''
-  try {
-    await uploadDocument(manageTarget.value.id, selectedDocumentFile.value, documentUploadDescription.value || undefined)
-    selectedDocumentFile.value = null
-    documentUploadDescription.value = ''
-    if (documentFileInput.value) documentFileInput.value.value = ''
-    toast.add({ title: 'Document uploaded', color: 'success' })
-    await loadDocuments()
-  } catch (err) {
-    documentUploadError.value = apiErrorMessage(err)
-  } finally {
-    documentUploading.value = false
-  }
+async function onDocumentUploaded() {
+  toast.add({ title: 'Document uploaded', color: 'success' })
+  await loadDocuments()
 }
 
 async function onDeleteDocument(doc: LeaseDocument) {
@@ -647,9 +621,6 @@ watch(showManage, async (value) => {
     depositPaymentsLoading.value = false
   }
 
-  selectedDocumentFile.value = null
-  documentUploadDescription.value = ''
-  documentUploadError.value = ''
   await loadDocuments()
 })
 

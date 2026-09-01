@@ -5,8 +5,15 @@
     :label="label"
     :name="field.name"
     :required="field.required"
-    :help="field.hint"
   >
+    <template v-if="field.hint" #label="{ label: labelText }">
+      <span class="inline-flex items-center gap-1">
+        {{ labelText }}
+        <UTooltip :text="field.hint" :delay-duration="150">
+          <UIcon name="i-lucide-info" class="size-3.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
+        </UTooltip>
+      </span>
+    </template>
     <component :is="control" v-model="model" :field="field" />
   </UFormField>
 </template>

@@ -101,9 +101,9 @@
             <UButton size="xs" color="error" variant="soft" icon="i-lucide-trash-2" @click="confirmDelete = row">
               Delete
             </UButton>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-settings-2" @click="openManageWith(row)">
-              Manage
-            </UButton>
+            <UDropdownMenu :items="rowActionItems(row)">
+              <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-ellipsis" />
+            </UDropdownMenu>
           </div>
         </template>
         <template #empty-state>
@@ -191,283 +191,258 @@
     </UModal>
 
     <UModal
-      v-model:open="showManage"
-      :title="`Manage unit '${manageTarget?.unitNumber ?? ''}'`"
-      :ui="{ content: 'sm:max-w-2xl' }"
+      v-model:open="showAmenities"
+      :title="`Amenities · ${amenitiesTarget?.unitNumber ?? ''}`"
     >
       <template #body>
-        <div class="max-h-[70vh] overflow-y-auto space-y-6 pr-1">
-          <!-- Amenities -->
-          <div>
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Amenities
-            </h3>
-            <div v-if="amenitiesLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="unitAmenities.length === 0" class="text-sm text-gray-400 mb-3">No amenities assigned.</div>
-            <div v-else class="space-y-1.5 mb-4">
-              <div
-                v-for="a in unitAmenities"
-                :key="a.id"
-                class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
-              >
-                <span class="text-gray-600 dark:text-gray-300">
-                  {{ a.amenityName }}
-                  <span v-if="a.amenityCategory" class="text-gray-400">({{ a.amenityCategory }})</span>
-                  <span v-if="a.notes" class="text-gray-400"> — {{ a.notes }}</span>
-                </span>
-                <UButton
-                  v-if="isAdmin"
-                  size="xs"
-                  color="error"
-                  variant="ghost"
-                  icon="i-lucide-trash-2"
-                  @click="onRemoveAmenity(a)"
-                />
-              </div>
-            </div>
-            <DynamicForm
+        <div v-if="amenitiesLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="unitAmenities.length === 0" class="text-sm text-gray-400 mb-3">No amenities assigned.</div>
+        <div v-else class="space-y-1.5 mb-4">
+          <div
+            v-for="a in unitAmenities"
+            :key="a.id"
+            class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
+          >
+            <span class="text-gray-600 dark:text-gray-300">
+              {{ a.amenityName }}
+              <span v-if="a.amenityCategory" class="text-gray-400">({{ a.amenityCategory }})</span>
+              <span v-if="a.notes" class="text-gray-400"> — {{ a.notes }}</span>
+            </span>
+            <UButton
               v-if="isAdmin"
-              v-model="assignAmenityForm"
-              :fields="assignAmenityFields"
-              :loading="assigningAmenity"
-              :error="assignAmenityError"
-              submit-label="Assign"
-              @submit="onAssignAmenity"
+              size="xs"
+              color="error"
+              variant="ghost"
+              icon="i-lucide-trash-2"
+              @click="onRemoveAmenity(a)"
             />
           </div>
+        </div>
+        <DynamicForm
+          v-if="isAdmin"
+          v-model="assignAmenityForm"
+          :fields="assignAmenityFields"
+          :loading="assigningAmenity"
+          :error="assignAmenityError"
+          submit-label="Assign"
+          @submit="onAssignAmenity"
+        />
+      </template>
+    </UModal>
 
-          <!-- Images -->
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Images
-            </h3>
-            <div v-if="imagesLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="unitImages.length === 0" class="text-sm text-gray-400 mb-3">No images uploaded yet.</div>
-            <div v-else class="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-4">
-              <div v-for="img in unitImages" :key="img.id" class="relative group">
-                <img
-                  v-if="imageUrls[img.id]"
-                  :src="imageUrls[img.id]"
-                  :alt="img.caption ?? img.fileName"
-                  class="w-full h-20 object-cover rounded border border-gray-200 dark:border-gray-800"
-                >
-                <div v-else class="w-full h-20 rounded border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-300">
-                  <UIcon name="i-lucide-image" class="size-5" />
-                </div>
-                <span
-                  v-if="img.primary"
-                  class="absolute top-1 left-1 bg-primary-500 text-white text-[10px] px-1.5 py-0.5 rounded"
-                >
-                  Primary
-                </span>
-                <div v-if="isAdmin" class="absolute inset-x-0 bottom-0 flex justify-center gap-1 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity py-1">
-                  <UButton
-                    v-if="!img.primary"
-                    size="xs"
-                    color="neutral"
-                    variant="solid"
-                    icon="i-lucide-star"
-                    @click="onSetPrimaryImage(img)"
-                  />
-                  <UButton
-                    size="xs"
-                    color="error"
-                    variant="solid"
-                    icon="i-lucide-trash-2"
-                    @click="onDeleteImage(img)"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div v-if="isAdmin" class="space-y-3">
-              <input ref="imageFileInput" type="file" accept="image/*" class="text-sm" @change="onImageFileChange">
-              <UInput v-model="imageCaption" placeholder="Caption (optional)" class="w-full" />
-              <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                <input v-model="imagePrimary" type="checkbox">
-                Set as primary
-              </label>
-              <UAlert v-if="imageUploadError" color="error" variant="subtle" :title="imageUploadError" />
-              <UButton :loading="uploadingImage" :disabled="!selectedImageFile" icon="i-lucide-upload" @click="onUploadImage">
-                Upload
-              </UButton>
-            </div>
+    <UModal
+      v-model:open="showOwnership"
+      :title="`Ownership history · ${ownershipTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="ownersLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="unitOwners.length === 0" class="text-sm text-gray-400 mb-3">No ownership records yet.</div>
+        <div v-else class="space-y-1.5 mb-4">
+          <div
+            v-for="o in unitOwners"
+            :key="o.id"
+            class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
+          >
+            <span class="text-gray-600 dark:text-gray-300">
+              {{ o.ownerName }}
+              <span v-if="o.ownerContact" class="text-gray-400">({{ o.ownerContact }})</span>
+              <span class="text-gray-400"> · {{ formatDate(o.ownershipStartDate) }} – {{ o.ownershipEndDate ? formatDate(o.ownershipEndDate) : 'present' }}</span>
+              <StatusBadge v-if="o.current" status="CURRENT" class="ml-1" />
+            </span>
+            <UButton
+              v-if="isAdmin && o.current"
+              size="xs"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-square-x"
+              :loading="endingOwnerId === o.id"
+              @click="onEndOwnership(o)"
+            >
+              End
+            </UButton>
           </div>
+        </div>
+        <DynamicForm
+          v-if="isAdmin"
+          v-model="addOwnerForm"
+          :fields="addOwnerFields"
+          :loading="addingOwner"
+          :error="addOwnerError"
+          submit-label="Add owner"
+          @submit="onAddOwner"
+        />
+      </template>
+    </UModal>
 
-          <!-- Certificates -->
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Certificates
-            </h3>
-            <div v-if="certificatesLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="unitCertificates.length === 0" class="text-sm text-gray-400 mb-3">No certificates uploaded yet.</div>
-            <div v-else class="space-y-1.5 mb-4">
-              <div
-                v-for="c in unitCertificates"
-                :key="c.id"
-                class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
-              >
-                <div>
-                  <button class="text-primary-500 hover:underline text-left" @click="onDownloadCertificate(c)">{{ c.fileName }}</button>
-                  <span v-if="c.description" class="text-gray-400"> — {{ c.description }}</span>
-                  <div class="text-xs text-gray-400">{{ formatDateTime(c.createdAt) }} · {{ c.uploadedBy ?? '—' }}</div>
-                </div>
-                <UButton
-                  v-if="isAdmin"
-                  size="xs"
-                  color="error"
-                  variant="ghost"
-                  icon="i-lucide-trash-2"
-                  @click="onDeleteCertificate(c)"
-                />
-              </div>
-            </div>
-
-            <div v-if="isAdmin" class="space-y-3">
-              <input ref="certificateFileInput" type="file" class="text-sm" @change="onCertificateFileChange">
-              <UInput v-model="certificateDescription" placeholder="Description (optional)" class="w-full" />
-              <UAlert v-if="certificateUploadError" color="error" variant="subtle" :title="certificateUploadError" />
-              <UButton :loading="uploadingCertificate" :disabled="!selectedCertificateFile" icon="i-lucide-upload" @click="onUploadCertificate">
-                Upload
-              </UButton>
-            </div>
+    <UModal
+      v-model:open="showPriceHistory"
+      :title="`Price history · ${priceHistoryTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="pricesLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="unitPrices.length === 0" class="text-sm text-gray-400 mb-3">No prices recorded yet.</div>
+        <div v-else class="space-y-1.5 mb-4">
+          <div
+            v-for="p in unitPrices"
+            :key="p.id"
+            class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
+          >
+            <span class="text-gray-600 dark:text-gray-300">
+              {{ formatEnum(p.priceType) }} · {{ formatDate(p.effectiveDate) }}
+              <span v-if="p.notes" class="text-gray-400"> — {{ p.notes }}</span>
+            </span>
+            <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(p.amount) }}</span>
           </div>
+        </div>
+        <DynamicForm
+          v-if="isAdmin"
+          v-model="addPriceForm"
+          :fields="addPriceFields"
+          :loading="addingPrice"
+          :error="addPriceError"
+          submit-label="Record price"
+          @submit="onAddPrice"
+        />
+      </template>
+    </UModal>
 
-          <!-- Documents -->
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Documents
-            </h3>
-            <div v-if="documentsLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="unitDocuments.length === 0" class="text-sm text-gray-400 mb-3">No documents uploaded yet.</div>
-            <div v-else class="space-y-1.5 mb-4">
-              <div
-                v-for="d in unitDocuments"
-                :key="d.id"
-                class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
-              >
-                <div>
-                  <button class="text-primary-500 hover:underline text-left" @click="onDownloadDocument(d)">{{ d.fileName }}</button>
-                  <span v-if="d.description" class="text-gray-400"> — {{ d.description }}</span>
-                  <div class="text-xs text-gray-400">{{ formatDateTime(d.createdAt) }} · {{ d.uploadedBy ?? '—' }}</div>
-                </div>
-                <UButton
-                  v-if="isAdmin"
-                  size="xs"
-                  color="error"
-                  variant="ghost"
-                  icon="i-lucide-trash-2"
-                  @click="onDeleteDocument(d)"
-                />
-              </div>
-            </div>
-
-            <div v-if="isAdmin" class="space-y-3">
-              <input ref="documentFileInput" type="file" class="text-sm" @change="onDocumentFileChange">
-              <UInput v-model="documentDescription" placeholder="Description (optional)" class="w-full" />
-              <UAlert v-if="documentUploadError" color="error" variant="subtle" :title="documentUploadError" />
-              <UButton :loading="uploadingDocument" :disabled="!selectedDocumentFile" icon="i-lucide-upload" @click="onUploadDocument">
-                Upload
-              </UButton>
-            </div>
+    <UModal
+      v-model:open="showStatusHistory"
+      :title="`Status history · ${statusHistoryTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="statusHistoryLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="statusHistory.length === 0" class="text-sm text-gray-400">No status changes recorded yet.</div>
+        <div v-else class="space-y-1.5">
+          <div
+            v-for="h in statusHistory"
+            :key="h.id"
+            class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
+          >
+            <span class="text-gray-600 dark:text-gray-300">
+              {{ formatEnum(h.statusField) }}: {{ h.previousStatus ? formatEnum(h.previousStatus) : '—' }} → {{ formatEnum(h.newStatus) }}
+              <span v-if="h.reason" class="text-gray-400"> — {{ h.reason }}</span>
+              <div class="text-xs text-gray-400">{{ formatDateTime(h.createdAt) }} · {{ h.changedBy ?? '—' }}</div>
+            </span>
           </div>
+        </div>
+      </template>
+    </UModal>
 
-          <!-- Ownership history -->
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Ownership history
-            </h3>
-            <div v-if="ownersLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="unitOwners.length === 0" class="text-sm text-gray-400 mb-3">No ownership records yet.</div>
-            <div v-else class="space-y-1.5 mb-4">
-              <div
-                v-for="o in unitOwners"
-                :key="o.id"
-                class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
-              >
-                <span class="text-gray-600 dark:text-gray-300">
-                  {{ o.ownerName }}
-                  <span v-if="o.ownerContact" class="text-gray-400">({{ o.ownerContact }})</span>
-                  <span class="text-gray-400"> · {{ formatDate(o.ownershipStartDate) }} – {{ o.ownershipEndDate ? formatDate(o.ownershipEndDate) : 'present' }}</span>
-                  <StatusBadge v-if="o.current" status="CURRENT" class="ml-1" />
-                </span>
-                <UButton
-                  v-if="isAdmin && o.current"
-                  size="xs"
-                  color="neutral"
-                  variant="soft"
-                  icon="i-lucide-square-x"
-                  :loading="endingOwnerId === o.id"
-                  @click="onEndOwnership(o)"
-                >
-                  End
-                </UButton>
-              </div>
+    <UModal
+      v-model:open="showImages"
+      :title="`Images · ${imagesTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="imagesLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="unitImages.length === 0" class="text-sm text-gray-400 mb-3">No images uploaded yet.</div>
+        <div v-else class="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-4">
+          <div v-for="img in unitImages" :key="img.id" class="relative group">
+            <img
+              v-if="imageUrls[img.id]"
+              :src="imageUrls[img.id]"
+              :alt="img.caption ?? img.fileName"
+              class="w-full h-20 object-cover rounded border border-gray-200 dark:border-gray-800 cursor-pointer"
+              @click="openImageLightbox(img.id)"
+            >
+            <div v-else class="w-full h-20 rounded border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-300">
+              <UIcon name="i-lucide-image" class="size-5" />
             </div>
-            <DynamicForm
-              v-if="isAdmin"
-              v-model="addOwnerForm"
-              :fields="addOwnerFields"
-              :loading="addingOwner"
-              :error="addOwnerError"
-              submit-label="Add owner"
-              @submit="onAddOwner"
-            />
-          </div>
-
-          <!-- Price history -->
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Price history
-            </h3>
-            <div v-if="pricesLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="unitPrices.length === 0" class="text-sm text-gray-400 mb-3">No prices recorded yet.</div>
-            <div v-else class="space-y-1.5 mb-4">
-              <div
-                v-for="p in unitPrices"
-                :key="p.id"
-                class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
-              >
-                <span class="text-gray-600 dark:text-gray-300">
-                  {{ formatEnum(p.priceType) }} · {{ formatDate(p.effectiveDate) }}
-                  <span v-if="p.notes" class="text-gray-400"> — {{ p.notes }}</span>
-                </span>
-                <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(p.amount) }}</span>
-              </div>
-            </div>
-            <DynamicForm
-              v-if="isAdmin"
-              v-model="addPriceForm"
-              :fields="addPriceFields"
-              :loading="addingPrice"
-              :error="addPriceError"
-              submit-label="Record price"
-              @submit="onAddPrice"
-            />
-          </div>
-
-          <!-- Status history -->
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Status history
-            </h3>
-            <div v-if="statusHistoryLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="statusHistory.length === 0" class="text-sm text-gray-400">No status changes recorded yet.</div>
-            <div v-else class="space-y-1.5">
-              <div
-                v-for="h in statusHistory"
-                :key="h.id"
-                class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
-              >
-                <span class="text-gray-600 dark:text-gray-300">
-                  {{ formatEnum(h.statusField) }}: {{ h.previousStatus ? formatEnum(h.previousStatus) : '—' }} → {{ formatEnum(h.newStatus) }}
-                  <span v-if="h.reason" class="text-gray-400"> — {{ h.reason }}</span>
-                  <div class="text-xs text-gray-400">{{ formatDateTime(h.createdAt) }} · {{ h.changedBy ?? '—' }}</div>
-                </span>
-              </div>
+            <span
+              v-if="img.primary"
+              class="absolute top-1 left-1 bg-primary-500 text-white text-[10px] px-1.5 py-0.5 rounded"
+            >
+              Primary
+            </span>
+            <div v-if="isAdmin" class="absolute inset-x-0 bottom-0 flex justify-center gap-1 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity py-1">
+              <UButton
+                v-if="!img.primary"
+                size="xs"
+                color="neutral"
+                variant="solid"
+                icon="i-lucide-star"
+                @click="onSetPrimaryImage(img)"
+              />
+              <UButton
+                size="xs"
+                color="error"
+                variant="solid"
+                icon="i-lucide-trash-2"
+                @click="onDeleteImage(img)"
+              />
             </div>
           </div>
         </div>
+
+        <ImageUploadCropField v-if="isAdmin" :upload="uploadImageForTarget" @uploaded="onImageUploaded" />
+
+        <ImageLightbox v-model:open="showImageLightbox" v-model:index="imageLightboxIndex" :images="imageLightboxItems" />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="showCertificates"
+      :title="`Certificates · ${certificatesTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="certificatesLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="unitCertificates.length === 0" class="text-sm text-gray-400 mb-3">No certificates uploaded yet.</div>
+        <div v-else class="space-y-1.5 mb-4">
+          <div
+            v-for="c in unitCertificates"
+            :key="c.id"
+            class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
+          >
+            <div>
+              <button class="text-primary-500 hover:underline text-left" @click="onDownloadCertificate(c)">{{ c.fileName }}</button>
+              <span v-if="c.description" class="text-gray-400"> — {{ c.description }}</span>
+              <div class="text-xs text-gray-400">{{ formatDateTime(c.createdAt) }} · {{ c.uploadedBy ?? '—' }}</div>
+            </div>
+            <UButton
+              v-if="isAdmin"
+              size="xs"
+              color="error"
+              variant="ghost"
+              icon="i-lucide-trash-2"
+              @click="onDeleteCertificate(c)"
+            />
+          </div>
+        </div>
+
+        <FileUploadField v-if="isAdmin" :upload="uploadCertificateForTarget" @uploaded="onCertificateUploaded" />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="showDocuments"
+      :title="`Documents · ${documentsTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="documentsLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="unitDocuments.length === 0" class="text-sm text-gray-400 mb-3">No documents uploaded yet.</div>
+        <div v-else class="space-y-1.5 mb-4">
+          <div
+            v-for="d in unitDocuments"
+            :key="d.id"
+            class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
+          >
+            <div>
+              <button class="text-primary-500 hover:underline text-left" @click="onDownloadDocument(d)">{{ d.fileName }}</button>
+              <span v-if="d.description" class="text-gray-400"> — {{ d.description }}</span>
+              <div class="text-xs text-gray-400">{{ formatDateTime(d.createdAt) }} · {{ d.uploadedBy ?? '—' }}</div>
+            </div>
+            <UButton
+              v-if="isAdmin"
+              size="xs"
+              color="error"
+              variant="ghost"
+              icon="i-lucide-trash-2"
+              @click="onDeleteDocument(d)"
+            />
+          </div>
+        </div>
+
+        <FileUploadField v-if="isAdmin" :upload="uploadDocumentForTarget" @uploaded="onDocumentUploaded" />
       </template>
     </UModal>
 
@@ -577,10 +552,20 @@ const SALE_STATUS_OPTIONS: { label: string; value: SaleStatus }[] = [
 ]
 const saleStatusFilterOptions = [{ label: 'All sale statuses', value: undefined }, ...SALE_STATUS_OPTIONS]
 
-// Business rule: a unit can't be OCCUPIED while its sale process has moved
-// past "just listed" — RESERVED/SOLD only apply to a VACANT unit. Enforced
-// client-side only (form option filtering), not on the backend.
-const SALE_STATUSES_REQUIRING_VACANT: SaleStatus[] = ['RESERVED', 'SOLD']
+// RESERVED/OCCUPIED are set only by the lease lifecycle (creating/approving
+// a lease); FOR_SALE/RESERVED/SOLD are set only by their matching sale
+// workflow (listing, agreement/reservation, ownership transfer). The manual
+// status endpoints below reject those values server-side (UnitServiceImpl),
+// so the create form and status-update modals only offer the values no
+// other flow owns.
+const MANUAL_OCCUPANCY_STATUS_OPTIONS: { label: string; value: OccupancyStatus }[] = [
+  { label: 'Vacant', value: 'VACANT' },
+  { label: 'Maintenance', value: 'MAINTENANCE' },
+  { label: 'Unavailable', value: 'UNAVAILABLE' }
+]
+const MANUAL_SALE_STATUS_OPTIONS: { label: string; value: SaleStatus }[] = [
+  { label: 'Not for sale', value: 'NOT_FOR_SALE' }
+]
 
 async function loadUnitTypeOptions() {
   const res = await listUnitTypes({ size: 200 })
@@ -641,27 +626,13 @@ const ORIENTATION_OPTIONS = [
   { label: 'West', value: 'WEST' }
 ]
 
-const createOccupancyBlocksSale = computed(() => createForm.value.occupancyStatus === 'OCCUPIED')
-const createSaleStatusOptions = computed(() =>
-  createOccupancyBlocksSale.value
-    ? SALE_STATUS_OPTIONS.filter((o) => !SALE_STATUSES_REQUIRING_VACANT.includes(o.value))
-    : SALE_STATUS_OPTIONS
-)
-
+// New units always start NOT_FOR_SALE (see MANUAL_SALE_STATUS_OPTIONS
+// comment above) — put them up for sale from the Sale listings page instead.
 const createFields = computed<FieldDef[]>(() => [
   { name: 'unitTypeId', label: 'Unit type', type: 'select', required: true, options: unitTypeOptions.value },
   { name: 'unitNumber', label: 'Unit number', required: true, wrapper: 'half' },
   { name: 'name', wrapper: 'half' },
-  { name: 'occupancyStatus', label: 'Occupancy status', type: 'select', options: OCCUPANCY_STATUS_OPTIONS, default: 'VACANT', wrapper: 'half' },
-  {
-    name: 'saleStatus',
-    label: 'Sale status',
-    type: 'select',
-    options: createSaleStatusOptions.value,
-    default: 'NOT_FOR_SALE',
-    wrapper: 'half',
-    hint: createOccupancyBlocksSale.value ? 'Occupied units can\'t be Reserved or Sold for sale.' : undefined
-  },
+  { name: 'occupancyStatus', label: 'Occupancy status', type: 'select', options: MANUAL_OCCUPANCY_STATUS_OPTIONS, default: 'VACANT', wrapper: 'half' },
   { name: 'view', type: 'select', options: VIEW_OPTIONS, wrapper: 'half' },
   { name: 'orientation', type: 'select', options: ORIENTATION_OPTIONS, wrapper: 'half' },
   { name: 'kitchen', type: 'switch', onLabel: 'Yes', offLabel: 'No' },
@@ -709,8 +680,7 @@ const {
     entityName: 'Unit',
     createDefaults: () => ({
       unitTypeId: filter.unitTypeId,
-      occupancyStatus: 'VACANT',
-      saleStatus: 'NOT_FOR_SALE'
+      occupancyStatus: 'VACANT'
     }),
     toForm: (row) => ({
       unitNumber: row.unitNumber,
@@ -727,7 +697,6 @@ const {
       unitNumber: values.unitNumber,
       name: values.name || undefined,
       occupancyStatus: values.occupancyStatus,
-      saleStatus: values.saleStatus,
       view: values.view || undefined,
       orientation: values.orientation || undefined,
       kitchen: values.kitchen,
@@ -748,18 +717,6 @@ const {
   }
 )
 
-// If occupancy flips to OCCUPIED while a now-invalid sale status (RESERVED/
-// SOLD) is still selected, drop it back to NOT_FOR_SALE rather than letting
-// the create form submit a combination its own options no longer offer.
-watch(
-  () => createForm.value.occupancyStatus,
-  (occupancyStatus) => {
-    if (occupancyStatus === 'OCCUPIED' && SALE_STATUSES_REQUIRING_VACANT.includes(createForm.value.saleStatus)) {
-      createForm.value.saleStatus = 'NOT_FOR_SALE'
-    }
-  }
-)
-
 // Occupancy status — its own endpoint, separate from sale status below.
 const {
   open: showOccupancyStatus,
@@ -770,27 +727,19 @@ const {
 } = useTargetModal<Unit>()
 
 const occupancyStatusForm = ref<Record<string, any>>({})
-// A unit currently RESERVED/SOLD for sale can't be marked OCCUPIED — that
-// combination only comes back once the sale status is cleared first.
-const occupancyBlockedBySale = computed(() => {
-  const saleStatus = occupancyStatusTarget.value?.saleStatus
-  return saleStatus ? SALE_STATUSES_REQUIRING_VACANT.includes(saleStatus) : false
-})
-const occupancyStatusFields = computed<FieldDef[]>(() => [
+// Reserved/Occupied are set automatically by creating/approving a lease for
+// this unit (see the Leases page) — the backend rejects them here.
+const occupancyStatusFields: FieldDef[] = [
   {
     name: 'occupancyStatus',
     label: 'Occupancy status',
     type: 'select',
     required: true,
-    options: occupancyBlockedBySale.value
-      ? OCCUPANCY_STATUS_OPTIONS.filter((o) => o.value !== 'OCCUPIED')
-      : OCCUPANCY_STATUS_OPTIONS,
-    hint: occupancyBlockedBySale.value
-      ? `This unit is ${formatEnum(occupancyStatusTarget.value!.saleStatus!)} for sale, so it can't be marked Occupied.`
-      : undefined
+    options: MANUAL_OCCUPANCY_STATUS_OPTIONS,
+    hint: 'Reserved and Occupied are set automatically by the lease workflow, not here.'
   },
   { name: 'reason' }
-])
+]
 
 watch(showOccupancyStatus, (value) => {
   if (value && occupancyStatusTarget.value) {
@@ -827,22 +776,21 @@ const {
 } = useTargetModal<Unit>()
 
 const saleStatusForm = ref<Record<string, any>>({})
-// An OCCUPIED unit can't move its sale status to RESERVED/SOLD — those only
-// apply once the unit is VACANT.
-const saleBlockedByOccupancy = computed(() => saleStatusTarget.value?.occupancyStatus === 'OCCUPIED')
-const saleStatusFields = computed<FieldDef[]>(() => [
+// For sale/Reserved/Sold are set automatically by creating a sale listing,
+// agreement/reservation, or completing an ownership transfer (see the Sale
+// listings / Sale agreements pages) — the backend rejects them here. This
+// modal only ever takes a unit off the market.
+const saleStatusFields: FieldDef[] = [
   {
     name: 'saleStatus',
     label: 'Sale status',
     type: 'select',
     required: true,
-    options: saleBlockedByOccupancy.value
-      ? SALE_STATUS_OPTIONS.filter((o) => !SALE_STATUSES_REQUIRING_VACANT.includes(o.value))
-      : SALE_STATUS_OPTIONS,
-    hint: saleBlockedByOccupancy.value ? 'This unit is occupied, so it can\'t be marked Reserved or Sold for sale.' : undefined
+    options: MANUAL_SALE_STATUS_OPTIONS,
+    hint: 'For sale, Reserved, and Sold are set automatically by the sale workflow, not here.'
   },
   { name: 'reason' }
-])
+]
 
 watch(showSaleStatus, (value) => {
   if (value && saleStatusTarget.value) {
@@ -892,10 +840,10 @@ function clearFilters() {
   load()
 }
 
-// ── Manage modal — 6 nested sub-resource sections ──────────────────────────
-const { open: showManage, target: manageTarget, openWith: openManageWith } = useTargetModal<Unit>()
+// ── Amenities — its own modal, separate from Manage below (was nested inside
+// it; split out since it's a distinct, self-contained action). ─────────────
+const { open: showAmenities, target: amenitiesTarget, openWith: openAmenitiesWith } = useTargetModal<Unit>()
 
-// Amenities
 const unitAmenities = ref<UnitAmenity[]>([])
 const amenitiesLoading = ref(false)
 const amenityOptions = ref<{ label: string; value: number }[]>([])
@@ -917,14 +865,14 @@ async function loadAmenitiesSection(unitId: number) {
 }
 
 async function onAssignAmenity(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!amenitiesTarget.value) return
   assigningAmenity.value = true
   assignAmenityError.value = ''
   try {
-    await assignUnitAmenity(manageTarget.value.id, { amenityId: values.amenityId, notes: values.notes || undefined })
+    await assignUnitAmenity(amenitiesTarget.value.id, { amenityId: values.amenityId, notes: values.notes || undefined })
     assignAmenityForm.value = {}
     toast.add({ title: 'Amenity assigned', color: 'success' })
-    await loadAmenitiesSection(manageTarget.value.id)
+    await loadAmenitiesSection(amenitiesTarget.value.id)
   } catch (err) {
     assignAmenityError.value = apiErrorMessage(err)
   } finally {
@@ -933,31 +881,32 @@ async function onAssignAmenity(values: Record<string, any>) {
 }
 
 async function onRemoveAmenity(row: UnitAmenity) {
-  if (!manageTarget.value) return
+  if (!amenitiesTarget.value) return
   try {
-    await removeUnitAmenity(manageTarget.value.id, row.id)
+    await removeUnitAmenity(amenitiesTarget.value.id, row.id)
     toast.add({ title: 'Amenity removed', color: 'success' })
-    await loadAmenitiesSection(manageTarget.value.id)
+    await loadAmenitiesSection(amenitiesTarget.value.id)
   } catch (err) {
     toast.add({ title: 'Could not remove amenity', description: apiErrorMessage(err), color: 'error' })
   }
 }
 
-// Images
+watch(showAmenities, async (value) => {
+  if (!value || !amenitiesTarget.value) return
+  assignAmenityForm.value = {}
+  assignAmenityError.value = ''
+  const amenitiesRes = await listAmenities({ size: 200 })
+  amenityOptions.value = amenitiesRes.data.map((a) => ({ label: a.name, value: a.id }))
+  await loadAmenitiesSection(amenitiesTarget.value.id)
+})
+
+// ── Images — its own modal, separate from Manage (which no longer exists —
+// every section that used to live there now has its own entry point). ─────
+const { open: showImages, target: imagesTarget, openWith: openImagesWith } = useTargetModal<Unit>()
+
 const unitImages = ref<UnitImage[]>([])
 const imagesLoading = ref(false)
 const imageUrls = ref<Record<number, string>>({})
-const imageFileInput = ref<HTMLInputElement | null>(null)
-const selectedImageFile = ref<File | null>(null)
-const imageCaption = ref('')
-const imagePrimary = ref(false)
-const uploadingImage = ref(false)
-const imageUploadError = ref('')
-
-function onImageFileChange(e: Event) {
-  const files = (e.target as HTMLInputElement).files
-  selectedImageFile.value = files && files.length > 0 ? files[0]! : null
-}
 
 async function loadImagesSection(unitId: number) {
   imagesLoading.value = true
@@ -974,60 +923,63 @@ async function loadImagesSection(unitId: number) {
   }
 }
 
-async function onUploadImage() {
-  if (!manageTarget.value || !selectedImageFile.value) return
-  uploadingImage.value = true
-  imageUploadError.value = ''
-  try {
-    await uploadUnitImage(manageTarget.value.id, selectedImageFile.value, imageCaption.value || undefined, imagePrimary.value)
-    selectedImageFile.value = null
-    imageCaption.value = ''
-    imagePrimary.value = false
-    if (imageFileInput.value) imageFileInput.value.value = ''
-    toast.add({ title: 'Image uploaded', color: 'success' })
-    await loadImagesSection(manageTarget.value.id)
-  } catch (err) {
-    imageUploadError.value = apiErrorMessage(err)
-  } finally {
-    uploadingImage.value = false
-  }
+function uploadImageForTarget(file: File, caption?: string, primary?: boolean) {
+  return uploadUnitImage(imagesTarget.value!.id, file, caption, primary)
+}
+
+const showImageLightbox = ref(false)
+const imageLightboxIndex = ref(0)
+const imageLightboxItems = computed(() =>
+  unitImages.value
+    .filter((img) => imageUrls.value[img.id])
+    .map((img) => ({ id: img.id, url: imageUrls.value[img.id]!, fileName: img.fileName, caption: img.caption }))
+)
+
+function openImageLightbox(imageId: number) {
+  const index = imageLightboxItems.value.findIndex((img) => img.id === imageId)
+  if (index === -1) return
+  imageLightboxIndex.value = index
+  showImageLightbox.value = true
+}
+
+async function onImageUploaded() {
+  if (!imagesTarget.value) return
+  toast.add({ title: 'Image uploaded', color: 'success' })
+  await loadImagesSection(imagesTarget.value.id)
 }
 
 async function onSetPrimaryImage(img: UnitImage) {
-  if (!manageTarget.value) return
+  if (!imagesTarget.value) return
   try {
-    await setPrimaryUnitImage(manageTarget.value.id, img.id)
+    await setPrimaryUnitImage(imagesTarget.value.id, img.id)
     toast.add({ title: 'Primary image updated', color: 'success' })
-    await loadImagesSection(manageTarget.value.id)
+    await loadImagesSection(imagesTarget.value.id)
   } catch (err) {
     toast.add({ title: 'Could not set primary image', description: apiErrorMessage(err), color: 'error' })
   }
 }
 
 async function onDeleteImage(img: UnitImage) {
-  if (!manageTarget.value) return
+  if (!imagesTarget.value) return
   try {
-    await removeUnitImage(manageTarget.value.id, img.id)
+    await removeUnitImage(imagesTarget.value.id, img.id)
     toast.add({ title: 'Image deleted', color: 'success' })
-    await loadImagesSection(manageTarget.value.id)
+    await loadImagesSection(imagesTarget.value.id)
   } catch (err) {
     toast.add({ title: 'Could not delete image', description: apiErrorMessage(err), color: 'error' })
   }
 }
 
-// Certificates
+watch(showImages, async (value) => {
+  if (!value || !imagesTarget.value) return
+  await loadImagesSection(imagesTarget.value.id)
+})
+
+// ── Certificates — its own modal, separate from Manage. ────────────────────
+const { open: showCertificates, target: certificatesTarget, openWith: openCertificatesWith } = useTargetModal<Unit>()
+
 const unitCertificates = ref<UnitCertificate[]>([])
 const certificatesLoading = ref(false)
-const certificateFileInput = ref<HTMLInputElement | null>(null)
-const selectedCertificateFile = ref<File | null>(null)
-const certificateDescription = ref('')
-const uploadingCertificate = ref(false)
-const certificateUploadError = ref('')
-
-function onCertificateFileChange(e: Event) {
-  const files = (e.target as HTMLInputElement).files
-  selectedCertificateFile.value = files && files.length > 0 ? files[0]! : null
-}
 
 async function loadCertificatesSection(unitId: number) {
   certificatesLoading.value = true
@@ -1038,57 +990,46 @@ async function loadCertificatesSection(unitId: number) {
   }
 }
 
-async function onUploadCertificate() {
-  if (!manageTarget.value || !selectedCertificateFile.value) return
-  uploadingCertificate.value = true
-  certificateUploadError.value = ''
-  try {
-    await uploadUnitCertificate(manageTarget.value.id, selectedCertificateFile.value, certificateDescription.value || undefined)
-    selectedCertificateFile.value = null
-    certificateDescription.value = ''
-    if (certificateFileInput.value) certificateFileInput.value.value = ''
-    toast.add({ title: 'Certificate uploaded', color: 'success' })
-    await loadCertificatesSection(manageTarget.value.id)
-  } catch (err) {
-    certificateUploadError.value = apiErrorMessage(err)
-  } finally {
-    uploadingCertificate.value = false
-  }
+function uploadCertificateForTarget(file: File, description?: string) {
+  return uploadUnitCertificate(certificatesTarget.value!.id, file, description)
+}
+
+async function onCertificateUploaded() {
+  if (!certificatesTarget.value) return
+  toast.add({ title: 'Certificate uploaded', color: 'success' })
+  await loadCertificatesSection(certificatesTarget.value.id)
 }
 
 async function onDownloadCertificate(c: UnitCertificate) {
-  if (!manageTarget.value) return
+  if (!certificatesTarget.value) return
   try {
-    await downloadUnitCertificate(manageTarget.value.id, c.id, c.fileName)
+    await downloadUnitCertificate(certificatesTarget.value.id, c.id, c.fileName)
   } catch (err) {
     toast.add({ title: 'Could not download certificate', description: apiErrorMessage(err), color: 'error' })
   }
 }
 
 async function onDeleteCertificate(c: UnitCertificate) {
-  if (!manageTarget.value) return
+  if (!certificatesTarget.value) return
   try {
-    await removeUnitCertificate(manageTarget.value.id, c.id)
+    await removeUnitCertificate(certificatesTarget.value.id, c.id)
     toast.add({ title: 'Certificate deleted', color: 'success' })
-    await loadCertificatesSection(manageTarget.value.id)
+    await loadCertificatesSection(certificatesTarget.value.id)
   } catch (err) {
     toast.add({ title: 'Could not delete certificate', description: apiErrorMessage(err), color: 'error' })
   }
 }
 
-// Documents
+watch(showCertificates, async (value) => {
+  if (!value || !certificatesTarget.value) return
+  await loadCertificatesSection(certificatesTarget.value.id)
+})
+
+// ── Documents — its own modal, separate from Manage. ────────────────────────
+const { open: showDocuments, target: documentsTarget, openWith: openDocumentsWith } = useTargetModal<Unit>()
+
 const unitDocuments = ref<UnitDocument[]>([])
 const documentsLoading = ref(false)
-const documentFileInput = ref<HTMLInputElement | null>(null)
-const selectedDocumentFile = ref<File | null>(null)
-const documentDescription = ref('')
-const uploadingDocument = ref(false)
-const documentUploadError = ref('')
-
-function onDocumentFileChange(e: Event) {
-  const files = (e.target as HTMLInputElement).files
-  selectedDocumentFile.value = files && files.length > 0 ? files[0]! : null
-}
 
 async function loadDocumentsSection(unitId: number) {
   documentsLoading.value = true
@@ -1099,45 +1040,45 @@ async function loadDocumentsSection(unitId: number) {
   }
 }
 
-async function onUploadDocument() {
-  if (!manageTarget.value || !selectedDocumentFile.value) return
-  uploadingDocument.value = true
-  documentUploadError.value = ''
-  try {
-    await uploadUnitDocument(manageTarget.value.id, selectedDocumentFile.value, documentDescription.value || undefined)
-    selectedDocumentFile.value = null
-    documentDescription.value = ''
-    if (documentFileInput.value) documentFileInput.value.value = ''
-    toast.add({ title: 'Document uploaded', color: 'success' })
-    await loadDocumentsSection(manageTarget.value.id)
-  } catch (err) {
-    documentUploadError.value = apiErrorMessage(err)
-  } finally {
-    uploadingDocument.value = false
-  }
+function uploadDocumentForTarget(file: File, description?: string) {
+  return uploadUnitDocument(documentsTarget.value!.id, file, description)
+}
+
+async function onDocumentUploaded() {
+  if (!documentsTarget.value) return
+  toast.add({ title: 'Document uploaded', color: 'success' })
+  await loadDocumentsSection(documentsTarget.value.id)
 }
 
 async function onDownloadDocument(d: UnitDocument) {
-  if (!manageTarget.value) return
+  if (!documentsTarget.value) return
   try {
-    await downloadUnitDocument(manageTarget.value.id, d.id, d.fileName)
+    await downloadUnitDocument(documentsTarget.value.id, d.id, d.fileName)
   } catch (err) {
     toast.add({ title: 'Could not download document', description: apiErrorMessage(err), color: 'error' })
   }
 }
 
 async function onDeleteDocument(d: UnitDocument) {
-  if (!manageTarget.value) return
+  if (!documentsTarget.value) return
   try {
-    await removeUnitDocument(manageTarget.value.id, d.id)
+    await removeUnitDocument(documentsTarget.value.id, d.id)
     toast.add({ title: 'Document deleted', color: 'success' })
-    await loadDocumentsSection(manageTarget.value.id)
+    await loadDocumentsSection(documentsTarget.value.id)
   } catch (err) {
     toast.add({ title: 'Could not delete document', description: apiErrorMessage(err), color: 'error' })
   }
 }
 
-// Ownership history
+watch(showDocuments, async (value) => {
+  if (!value || !documentsTarget.value) return
+  await loadDocumentsSection(documentsTarget.value.id)
+})
+
+// ── Ownership history — its own modal, separate from Manage (same reasoning
+// as Amenities above). ──────────────────────────────────────────────────
+const { open: showOwnership, target: ownershipTarget, openWith: openOwnershipWith } = useTargetModal<Unit>()
+
 const unitOwners = ref<UnitOwner[]>([])
 const ownersLoading = ref(false)
 const addOwnerForm = ref<Record<string, any>>({})
@@ -1161,11 +1102,11 @@ async function loadOwnersSection(unitId: number) {
 }
 
 async function onAddOwner(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!ownershipTarget.value) return
   addingOwner.value = true
   addOwnerError.value = ''
   try {
-    await createUnitOwner(manageTarget.value.id, {
+    await createUnitOwner(ownershipTarget.value.id, {
       ownerName: values.ownerName,
       ownerContact: values.ownerContact || undefined,
       ownershipStartDate: values.ownershipStartDate,
@@ -1173,7 +1114,7 @@ async function onAddOwner(values: Record<string, any>) {
     })
     addOwnerForm.value = {}
     toast.add({ title: 'Owner added', color: 'success' })
-    await loadOwnersSection(manageTarget.value.id)
+    await loadOwnersSection(ownershipTarget.value.id)
   } catch (err) {
     addOwnerError.value = apiErrorMessage(err)
   } finally {
@@ -1182,12 +1123,12 @@ async function onAddOwner(values: Record<string, any>) {
 }
 
 async function onEndOwnership(o: UnitOwner) {
-  if (!manageTarget.value) return
+  if (!ownershipTarget.value) return
   endingOwnerId.value = o.id
   try {
-    await endUnitOwner(manageTarget.value.id, o.id)
+    await endUnitOwner(ownershipTarget.value.id, o.id)
     toast.add({ title: 'Ownership ended', color: 'success' })
-    await loadOwnersSection(manageTarget.value.id)
+    await loadOwnersSection(ownershipTarget.value.id)
   } catch (err) {
     toast.add({ title: 'Could not end ownership', description: apiErrorMessage(err), color: 'error' })
   } finally {
@@ -1195,7 +1136,17 @@ async function onEndOwnership(o: UnitOwner) {
   }
 }
 
-// Price history
+watch(showOwnership, async (value) => {
+  if (!value || !ownershipTarget.value) return
+  addOwnerForm.value = {}
+  addOwnerError.value = ''
+  await loadOwnersSection(ownershipTarget.value.id)
+})
+
+// ── Price history — its own modal, separate from Manage (same reasoning as
+// Amenities/Ownership above). ───────────────────────────────────────────
+const { open: showPriceHistory, target: priceHistoryTarget, openWith: openPriceHistoryWith } = useTargetModal<Unit>()
+
 const unitPrices = ref<UnitPrice[]>([])
 const pricesLoading = ref(false)
 const addPriceForm = ref<Record<string, any>>({})
@@ -1222,11 +1173,11 @@ async function loadPricesSection(unitId: number) {
 }
 
 async function onAddPrice(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!priceHistoryTarget.value) return
   addingPrice.value = true
   addPriceError.value = ''
   try {
-    await createUnitPrice(manageTarget.value.id, {
+    await createUnitPrice(priceHistoryTarget.value.id, {
       priceType: values.priceType,
       amount: values.amount,
       effectiveDate: values.effectiveDate,
@@ -1234,7 +1185,7 @@ async function onAddPrice(values: Record<string, any>) {
     })
     addPriceForm.value = {}
     toast.add({ title: 'Price recorded', color: 'success' })
-    await loadPricesSection(manageTarget.value.id)
+    await loadPricesSection(priceHistoryTarget.value.id)
   } catch (err) {
     addPriceError.value = apiErrorMessage(err)
   } finally {
@@ -1242,8 +1193,18 @@ async function onAddPrice(values: Record<string, any>) {
   }
 }
 
-// Status history — read-only, populated from the same dedicated endpoint the
-// occupancy/sale status updates above write to.
+watch(showPriceHistory, async (value) => {
+  if (!value || !priceHistoryTarget.value) return
+  addPriceForm.value = {}
+  addPriceError.value = ''
+  await loadPricesSection(priceHistoryTarget.value.id)
+})
+
+// ── Status history — its own modal, separate from Manage (same reasoning as
+// Amenities/Ownership/Price above). Read-only, populated from the same
+// dedicated endpoint the occupancy/sale status updates write to. ──────────
+const { open: showStatusHistory, target: statusHistoryTarget, openWith: openStatusHistoryWith } = useTargetModal<Unit>()
+
 const statusHistory = ref<UnitStatusHistoryEntry[]>([])
 const statusHistoryLoading = ref(false)
 
@@ -1256,38 +1217,26 @@ async function loadStatusHistorySection(unitId: number) {
   }
 }
 
-watch(showManage, async (value) => {
-  if (!value || !manageTarget.value) return
-  const unitId = manageTarget.value.id
-
-  assignAmenityForm.value = {}
-  assignAmenityError.value = ''
-  selectedImageFile.value = null
-  imageCaption.value = ''
-  imagePrimary.value = false
-  imageUploadError.value = ''
-  selectedCertificateFile.value = null
-  certificateDescription.value = ''
-  certificateUploadError.value = ''
-  selectedDocumentFile.value = null
-  documentDescription.value = ''
-  documentUploadError.value = ''
-  addOwnerForm.value = {}
-  addOwnerError.value = ''
-  addPriceForm.value = {}
-  addPriceError.value = ''
-
-  const amenitiesRes = await listAmenities({ size: 200 })
-  amenityOptions.value = amenitiesRes.data.map((a) => ({ label: a.name, value: a.id }))
-
-  await Promise.all([
-    loadAmenitiesSection(unitId),
-    loadImagesSection(unitId),
-    loadCertificatesSection(unitId),
-    loadDocumentsSection(unitId),
-    loadOwnersSection(unitId),
-    loadPricesSection(unitId),
-    loadStatusHistorySection(unitId)
-  ])
+watch(showStatusHistory, async (value) => {
+  if (!value || !statusHistoryTarget.value) return
+  await loadStatusHistorySection(statusHistoryTarget.value.id)
 })
+
+// Secondary row actions collapsed into a single "⋯" menu — Edit/Delete stay
+// as direct buttons since they're the most common actions.
+function rowActionItems(row: Unit) {
+  return [
+    [
+      { label: 'Amenities', icon: 'i-lucide-sparkles', onSelect: () => openAmenitiesWith(row) },
+      { label: 'Ownership', icon: 'i-lucide-user-check', onSelect: () => openOwnershipWith(row) },
+      { label: 'Price history', icon: 'i-lucide-dollar-sign', onSelect: () => openPriceHistoryWith(row) },
+      { label: 'Status history', icon: 'i-lucide-history', onSelect: () => openStatusHistoryWith(row) }
+    ],
+    [
+      { label: 'Images', icon: 'i-lucide-image', onSelect: () => openImagesWith(row) },
+      { label: 'Certificates', icon: 'i-lucide-file-badge', onSelect: () => openCertificatesWith(row) },
+      { label: 'Documents', icon: 'i-lucide-file-text', onSelect: () => openDocumentsWith(row) }
+    ]
+  ]
+}
 </script>

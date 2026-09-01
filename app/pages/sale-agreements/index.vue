@@ -314,14 +314,7 @@
                 />
               </div>
             </div>
-            <div v-if="isAdmin" class="space-y-3">
-              <input ref="docFileInput" type="file" class="text-sm" @change="onDocFileChange" />
-              <UInput v-model="docDescription" placeholder="Description (optional)" class="w-full" />
-              <UAlert v-if="docUploadError" color="error" variant="subtle" :title="docUploadError" />
-              <UButton :loading="docUploading" :disabled="!docSelectedFile" icon="i-lucide-upload" @click="onUploadDocument">
-                Upload
-              </UButton>
-            </div>
+            <FileUploadField v-if="isAdmin" :upload="uploadDocumentForTarget" @uploaded="onDocumentUploaded" />
           </div>
 
           <!-- Handover -->
@@ -895,31 +888,14 @@ async function onRecordDownPayment(values: Record<string, any>) {
 // Documents
 const documents = ref<SaleAgreementDocument[]>([])
 const documentsLoading = ref(false)
-const docSelectedFile = ref<File | null>(null)
-const docDescription = ref('')
-const docUploading = ref(false)
-const docUploadError = ref('')
-const docFileInput = ref<HTMLInputElement | null>(null)
-function onDocFileChange(e: Event) {
-  const target = e.target as HTMLInputElement
-  docSelectedFile.value = target.files?.[0] ?? null
+
+function uploadDocumentForTarget(file: File, description?: string) {
+  return uploadDoc(manageTarget.value!.id, file, description)
 }
-async function onUploadDocument() {
-  if (!manageTarget.value || !docSelectedFile.value) return
-  docUploading.value = true
-  docUploadError.value = ''
-  try {
-    await uploadDoc(manageTarget.value.id, docSelectedFile.value, docDescription.value || undefined)
-    docSelectedFile.value = null
-    docDescription.value = ''
-    if (docFileInput.value) docFileInput.value.value = ''
-    documents.value = await listDocs(manageTarget.value.id)
-    toast.add({ title: 'Document uploaded', color: 'success' })
-  } catch (err) {
-    docUploadError.value = apiErrorMessage(err)
-  } finally {
-    docUploading.value = false
-  }
+async function onDocumentUploaded() {
+  if (!manageTarget.value) return
+  documents.value = await listDocs(manageTarget.value.id)
+  toast.add({ title: 'Document uploaded', color: 'success' })
 }
 async function onDeleteDocument(doc: SaleAgreementDocument) {
   if (!manageTarget.value) return
@@ -1070,9 +1046,6 @@ watch(showManage, async (value) => {
   transferLoading.value = true
   documents.value = []
   documentsLoading.value = true
-  docSelectedFile.value = null
-  docDescription.value = ''
-  docUploadError.value = ''
   payments.value = []
   paymentsLoading.value = true
   downPaymentForm.value = { paymentDate: new Date().toISOString().slice(0, 10) }
