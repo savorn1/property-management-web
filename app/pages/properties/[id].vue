@@ -168,14 +168,12 @@ const activeRentTotal = computed(() => activeLeases.value.reduce((sum, l) => sum
 const activeSaleAgreements = computed(() => saleAgreements.value.filter((a) => a.status === 'ACTIVE'))
 const activeSaleValueTotal = computed(() => activeSaleAgreements.value.reduce((sum, a) => sum + a.netPrice, 0))
 
-// Occupancy only — sale status (NOT_FOR_SALE/FOR_SALE/RESERVED/SOLD) is a
-// separate dimension on Unit, not part of occupancy (see useUnits.ts).
+// Occupancy only (VACANT/OCCUPIED) — sale status (NOT_FOR_SALE/AVAILABLE/
+// RESERVED/SOLD) and maintenance status (NORMAL/MAINTENANCE) are separate
+// dimensions on Unit, not part of occupancy (see useUnits.ts).
 const UNIT_OCCUPANCY_SEGMENTS: { key: string; label: string; status: Unit['occupancyStatus']; barClass: string; dotClass: string }[] = [
   { key: 'occupied', label: 'Occupied', status: 'OCCUPIED', barClass: 'bg-info', dotClass: 'bg-info' },
-  { key: 'vacant', label: 'Vacant', status: 'VACANT', barClass: 'bg-success', dotClass: 'bg-success' },
-  { key: 'reserved', label: 'Reserved', status: 'RESERVED', barClass: 'bg-warning', dotClass: 'bg-warning' },
-  { key: 'maintenance', label: 'Maintenance', status: 'MAINTENANCE', barClass: 'bg-secondary', dotClass: 'bg-secondary' },
-  { key: 'unavailable', label: 'Blocked', status: 'UNAVAILABLE', barClass: 'bg-gray-400 dark:bg-gray-600', dotClass: 'bg-gray-400 dark:bg-gray-600' }
+  { key: 'vacant', label: 'Vacant', status: 'VACANT', barClass: 'bg-success', dotClass: 'bg-success' }
 ]
 const unitSegments = computed(() =>
   UNIT_OCCUPANCY_SEGMENTS.map((segment) => ({

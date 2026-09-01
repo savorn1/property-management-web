@@ -33,18 +33,19 @@ const STATUS_META: Record<string, { color: StatusColor; icon: string }> = {
   UP: { color: 'success', icon: 'i-lucide-check-circle' },
   DOWN: { color: 'error', icon: 'i-lucide-x-circle' },
   DISABLED: { color: 'neutral', icon: 'i-lucide-power-off' },
-  // Unit occupancy status (useUnits' OccupancyStatus) — AVAILABLE is a
-  // ParkingSpotStatus value, not occupancy's (that one uses VACANT).
+  // Unit occupancy status (useUnits' OccupancyStatus). AVAILABLE is shared
+  // with ParkingSpotStatus and Unit's SaleStatus (both use that spelling).
   AVAILABLE: { color: 'success', icon: 'i-lucide-check-circle' },
   VACANT: { color: 'success', icon: 'i-lucide-check-circle' },
   OCCUPIED: { color: 'info', icon: 'i-lucide-door-closed' },
   RESERVED: { color: 'warning', icon: 'i-lucide-bookmark' },
-  MAINTENANCE: { color: 'warning', icon: 'i-lucide-wrench' },
   UNAVAILABLE: { color: 'cancelled', icon: 'i-lucide-ban' },
-  // Unit sale status (useUnits' SaleStatus) — RESERVED/SOLD already covered.
+  // Unit sale status (useUnits' SaleStatus) — AVAILABLE/RESERVED/SOLD already covered.
   NOT_FOR_SALE: { color: 'neutral', icon: 'i-lucide-circle-slash' },
-  FOR_SALE: { color: 'info', icon: 'i-lucide-tag' },
   SOLD: { color: 'secondary', icon: 'i-lucide-tag' },
+  // Unit maintenance status (useUnits' UnitMaintenanceStatus).
+  NORMAL: { color: 'success', icon: 'i-lucide-check-circle' },
+  MAINTENANCE: { color: 'warning', icon: 'i-lucide-wrench' },
   // Tenant status (useTenants' TenantStatus) — ACTIVE already covered above.
   INACTIVE: { color: 'neutral', icon: 'i-lucide-power-off' },
   BLACKLISTED: { color: 'error', icon: 'i-lucide-ban' },

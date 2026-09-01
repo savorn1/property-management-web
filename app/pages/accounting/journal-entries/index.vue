@@ -278,6 +278,7 @@ import type { JournalSourceType } from '#shared/domain'
 
 definePageMeta({ middleware: 'admin' })
 
+const route = useRoute()
 const { list, get, create, post, voidEntry } = useJournalEntries()
 const { list: listPeriods } = useFinancialPeriods()
 const { list: listSchemes } = useAccountingSchemes()
@@ -288,12 +289,13 @@ const rows = ref<JournalEntry[]>([])
 const loading = ref(false)
 const error = ref('')
 
+const initialStatus = (route.query.status as JournalEntryStatus | undefined) || undefined
 const filter = reactive<{
   status: JournalEntryStatus | undefined
   sourceType: JournalSourceType | undefined
   financialPeriodId: number | undefined
 }>({
-  status: undefined,
+  status: initialStatus,
   sourceType: undefined,
   financialPeriodId: undefined
 })

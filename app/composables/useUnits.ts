@@ -1,15 +1,21 @@
 // Wraps the backend's UnitController (/api/units). Every unit belongs to a
 // unit type (which in turn belongs to a floor/building/property).
 //
-// Occupancy and sale status are two independent dimensions on the backend —
-// a unit can be OCCUPIED (rent side) while also FOR_SALE (sale side) — each
-// with its own PUT endpoint and optional `reason`, verified against the live
-// backend's /v3/api-docs. There is no single combined "status" field/endpoint
-// (an earlier version of this file assumed one; PUT /api/units/{id}/status
-// doesn't exist and would 404).
+// Status is three independent dimensions — occupancy, sale, and maintenance —
+// each with its own PUT endpoint and optional `reason`.
+//
+// NOTE: only occupancy-status and sale-status are confirmed against the live
+// backend's /v3/api-docs, and only with a different value set than used here
+// (occupancy also had RESERVED/UNAVAILABLE; sale used FOR_SALE, not
+// AVAILABLE). This file was deliberately moved ahead of that verified
+// contract onto a newer 3-axis model — maintenance-status doesn't exist on
+// the backend at all yet. Until the backend is redesigned to match, calls
+// here will either 404 (maintenance-status) or be rejected for an unknown
+// enum value (sale-status's AVAILABLE).
 
-export type OccupancyStatus = 'VACANT' | 'RESERVED' | 'OCCUPIED' | 'MAINTENANCE' | 'UNAVAILABLE'
-export type SaleStatus = 'NOT_FOR_SALE' | 'FOR_SALE' | 'RESERVED' | 'SOLD'
+export type OccupancyStatus = 'VACANT' | 'OCCUPIED'
+export type SaleStatus = 'NOT_FOR_SALE' | 'AVAILABLE' | 'RESERVED' | 'SOLD'
+export type UnitMaintenanceStatus = 'NORMAL' | 'MAINTENANCE'
 
 export interface Unit {
   id: number
@@ -25,6 +31,7 @@ export interface Unit {
   name: string | null
   occupancyStatus: OccupancyStatus | null
   saleStatus: SaleStatus | null
+  maintenanceStatus: UnitMaintenanceStatus | null
   kitchen: boolean | null
   balcony: boolean | null
   furnished: boolean | null
@@ -39,6 +46,7 @@ export interface UnitFilter {
   unitTypeId?: number
   occupancyStatus?: OccupancyStatus
   saleStatus?: SaleStatus
+  maintenanceStatus?: UnitMaintenanceStatus
   unitNumber?: string
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
@@ -52,6 +60,7 @@ export interface CreateUnitPayload {
   name?: string
   occupancyStatus?: OccupancyStatus
   saleStatus?: SaleStatus
+  maintenanceStatus?: UnitMaintenanceStatus
   kitchen?: boolean
   balcony?: boolean
   furnished?: boolean
@@ -60,8 +69,8 @@ export interface CreateUnitPayload {
   description?: string
 }
 
-// No occupancy/sale status here — those only change through their own
-// dedicated endpoints below, not the general update.
+// No status fields here — those only change through their own dedicated
+// endpoints below, not the general update.
 export interface UpdateUnitPayload {
   unitNumber?: string
   name?: string
@@ -80,6 +89,11 @@ export interface UpdateOccupancyStatusPayload {
 
 export interface UpdateSaleStatusPayload {
   saleStatus: SaleStatus
+  reason?: string
+}
+
+export interface UpdateUnitMaintenanceStatusPayload {
+  maintenanceStatus: UnitMaintenanceStatus
   reason?: string
 }
 
@@ -150,6 +164,11 @@ export function useUnits() {
     return res.data
   }
 
+  async function updateMaintenanceStatus(id: number, payload: UpdateUnitMaintenanceStatusPayload) {
+    const res = await api<ApiEnvelope<Unit>>(`/api/units/${id}/maintenance-status`, { method: 'PUT', body: payload })
+    return res.data
+  }
+
   async function getStatusHistory(id: number) {
     const res = await api<ApiEnvelope<UnitStatusHistoryEntry[]>>(`/api/units/${id}/status-history`)
     return res.data
@@ -159,5 +178,15 @@ export function useUnits() {
     await api(`/api/units/${id}`, { method: 'DELETE' })
   }
 
-  return { list, get, create, update, updateOccupancyStatus, updateSaleStatus, getStatusHistory, remove }
+  return {
+    list,
+    get,
+    create,
+    update,
+    updateOccupancyStatus,
+    updateSaleStatus,
+    updateMaintenanceStatus,
+    getStatusHistory,
+    remove
+  }
 }

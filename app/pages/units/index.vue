@@ -25,6 +25,12 @@
           placeholder="Sale status"
           class="w-40"
         />
+        <USelect
+          v-model="filter.maintenanceStatus"
+          :items="maintenanceStatusFilterOptions"
+          placeholder="Maintenance"
+          class="w-40"
+        />
         <UInput
           v-model="filter.unitNumber"
           placeholder="Unit number"
@@ -86,6 +92,15 @@
               @click="openSaleStatusWith(row)"
             >
               Sale status
+            </UButton>
+            <UButton
+              size="xs"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-wrench"
+              @click="openMaintenanceStatusWith(row)"
+            >
+              Maintenance
             </UButton>
             <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-pencil" @click="openEdit(row)">
               Edit
@@ -178,6 +193,21 @@
           cancelable
           @submit="onSaleStatusSubmit"
           @cancel="showSaleStatus = false"
+        />
+      </template>
+    </UModal>
+
+    <UModal v-model:open="showMaintenanceStatus" :title="`Update maintenance status for unit '${maintenanceStatusTarget?.unitNumber ?? ''}'`">
+      <template #body>
+        <DynamicForm
+          v-model="maintenanceStatusForm"
+          :fields="maintenanceStatusFields"
+          :loading="maintenanceStatusLoading"
+          :error="maintenanceStatusError"
+          submit-label="Update"
+          cancelable
+          @submit="onMaintenanceStatusSubmit"
+          @cancel="showMaintenanceStatus = false"
         />
       </template>
     </UModal>
@@ -480,6 +510,7 @@
 import type { ColumnDef, FieldDef } from '#shared/types'
 import type {
   CreateUnitPayload,
+  UnitMaintenanceStatus,
   OccupancyStatus,
   SaleStatus,
   Unit,
@@ -495,7 +526,16 @@ import type { PriceType, UnitPrice } from '~/composables/useUnitPrices'
 
 const route = useRoute()
 const { isAdmin } = useAuth()
-const { list, create, update, updateOccupancyStatus, updateSaleStatus, getStatusHistory, remove } = useUnits()
+const {
+  list,
+  create,
+  update,
+  updateOccupancyStatus,
+  updateSaleStatus,
+  updateMaintenanceStatus,
+  getStatusHistory,
+  remove
+} = useUnits()
 const { list: listUnitTypes } = useUnitTypes()
 const { list: listAmenities } = useAmenities()
 const { list: listUnitAmenities, assign: assignUnitAmenity, remove: removeUnitAmenity } = useUnitAmenities()
@@ -529,15 +569,18 @@ const error = ref('')
 const initialUnitTypeId = Number(route.query.unitTypeId) || undefined
 const initialOccupancyStatus = (route.query.occupancyStatus as OccupancyStatus | undefined) || undefined
 const initialSaleStatus = (route.query.saleStatus as SaleStatus | undefined) || undefined
+const initialMaintenanceStatus = (route.query.maintenanceStatus as UnitMaintenanceStatus | undefined) || undefined
 const filter = reactive<{
   unitTypeId: number | undefined
   occupancyStatus: OccupancyStatus | undefined
   saleStatus: SaleStatus | undefined
+  maintenanceStatus: UnitMaintenanceStatus | undefined
   unitNumber: string
 }>({
   unitTypeId: initialUnitTypeId,
   occupancyStatus: initialOccupancyStatus,
   saleStatus: initialSaleStatus,
+  maintenanceStatus: initialMaintenanceStatus,
   unitNumber: ''
 })
 
@@ -546,20 +589,28 @@ const unitTypeFilterOptions = computed(() => [{ label: 'All unit types', value: 
 
 const OCCUPANCY_STATUS_OPTIONS: { label: string; value: OccupancyStatus }[] = [
   { label: 'Vacant', value: 'VACANT' },
-  { label: 'Occupied', value: 'OCCUPIED' },
-  { label: 'Reserved', value: 'RESERVED' },
-  { label: 'Maintenance', value: 'MAINTENANCE' },
-  { label: 'Unavailable', value: 'UNAVAILABLE' }
+  { label: 'Occupied', value: 'OCCUPIED' }
 ]
 const occupancyStatusFilterOptions = [{ label: 'All occupancy', value: undefined }, ...OCCUPANCY_STATUS_OPTIONS]
 
 const SALE_STATUS_OPTIONS: { label: string; value: SaleStatus }[] = [
   { label: 'Not for sale', value: 'NOT_FOR_SALE' },
-  { label: 'For sale', value: 'FOR_SALE' },
+  { label: 'Available', value: 'AVAILABLE' },
   { label: 'Reserved', value: 'RESERVED' },
   { label: 'Sold', value: 'SOLD' }
 ]
 const saleStatusFilterOptions = [{ label: 'All sale statuses', value: undefined }, ...SALE_STATUS_OPTIONS]
+
+// Business rule: a unit can't be OCCUPIED while its sale process has moved
+// past "just listed" — RESERVED/SOLD only apply to a VACANT unit. Enforced
+// client-side only (form option filtering), not on the backend.
+const SALE_STATUSES_REQUIRING_VACANT: SaleStatus[] = ['RESERVED', 'SOLD']
+
+const MAINTENANCE_STATUS_OPTIONS: { label: string; value: UnitMaintenanceStatus }[] = [
+  { label: 'Normal', value: 'NORMAL' },
+  { label: 'Maintenance', value: 'MAINTENANCE' }
+]
+const maintenanceStatusFilterOptions = [{ label: 'All maintenance', value: undefined }, ...MAINTENANCE_STATUS_OPTIONS]
 
 async function loadUnitTypeOptions() {
   const res = await listUnitTypes({ size: 200 })
@@ -582,6 +633,7 @@ const columns: ColumnDef<Unit>[] = [
   { key: 'buildingName', label: 'Building', value: (row) => row.buildingName ?? '—' },
   { key: 'occupancyStatus', label: 'Occupancy', type: 'status' },
   { key: 'saleStatus', label: 'Sale status', type: 'status' },
+  { key: 'maintenanceStatus', label: 'Maintenance', type: 'status' },
   { key: 'actions', label: '' }
 ]
 
@@ -593,6 +645,7 @@ async function load() {
       unitTypeId: filter.unitTypeId,
       occupancyStatus: filter.occupancyStatus,
       saleStatus: filter.saleStatus,
+      maintenanceStatus: filter.maintenanceStatus,
       unitNumber: filter.unitNumber || undefined,
       sortBy: sort.value?.column,
       sortOrder: sort.value?.direction,
@@ -620,12 +673,28 @@ const ORIENTATION_OPTIONS = [
   { label: 'West', value: 'WEST' }
 ]
 
+const createOccupancyBlocksSale = computed(() => createForm.value.occupancyStatus === 'OCCUPIED')
+const createSaleStatusOptions = computed(() =>
+  createOccupancyBlocksSale.value
+    ? SALE_STATUS_OPTIONS.filter((o) => !SALE_STATUSES_REQUIRING_VACANT.includes(o.value))
+    : SALE_STATUS_OPTIONS
+)
+
 const createFields = computed<FieldDef[]>(() => [
   { name: 'unitTypeId', label: 'Unit type', type: 'select', required: true, options: unitTypeOptions.value },
   { name: 'unitNumber', label: 'Unit number', required: true, wrapper: 'half' },
   { name: 'name', wrapper: 'half' },
   { name: 'occupancyStatus', label: 'Occupancy status', type: 'select', options: OCCUPANCY_STATUS_OPTIONS, default: 'VACANT', wrapper: 'half' },
-  { name: 'saleStatus', label: 'Sale status', type: 'select', options: SALE_STATUS_OPTIONS, default: 'NOT_FOR_SALE', wrapper: 'half' },
+  {
+    name: 'saleStatus',
+    label: 'Sale status',
+    type: 'select',
+    options: createSaleStatusOptions.value,
+    default: 'NOT_FOR_SALE',
+    wrapper: 'half',
+    hint: createOccupancyBlocksSale.value ? 'Occupied units can\'t be Reserved or Sold for sale.' : undefined
+  },
+  { name: 'maintenanceStatus', label: 'Maintenance status', type: 'select', options: MAINTENANCE_STATUS_OPTIONS, default: 'NORMAL', wrapper: 'half' },
   { name: 'view', type: 'select', options: VIEW_OPTIONS, wrapper: 'half' },
   { name: 'orientation', type: 'select', options: ORIENTATION_OPTIONS, wrapper: 'half' },
   { name: 'kitchen', type: 'switch', onLabel: 'Yes', offLabel: 'No' },
@@ -671,7 +740,12 @@ const {
   load,
   {
     entityName: 'Unit',
-    createDefaults: () => ({ unitTypeId: filter.unitTypeId, occupancyStatus: 'VACANT', saleStatus: 'NOT_FOR_SALE' }),
+    createDefaults: () => ({
+      unitTypeId: filter.unitTypeId,
+      occupancyStatus: 'VACANT',
+      saleStatus: 'NOT_FOR_SALE',
+      maintenanceStatus: 'NORMAL'
+    }),
     toForm: (row) => ({
       unitNumber: row.unitNumber,
       name: row.name ?? '',
@@ -688,6 +762,7 @@ const {
       name: values.name || undefined,
       occupancyStatus: values.occupancyStatus,
       saleStatus: values.saleStatus,
+      maintenanceStatus: values.maintenanceStatus,
       view: values.view || undefined,
       orientation: values.orientation || undefined,
       kitchen: values.kitchen,
@@ -708,6 +783,18 @@ const {
   }
 )
 
+// If occupancy flips to OCCUPIED while a now-invalid sale status (RESERVED/
+// SOLD) is still selected, drop it back to NOT_FOR_SALE rather than letting
+// the create form submit a combination its own options no longer offer.
+watch(
+  () => createForm.value.occupancyStatus,
+  (occupancyStatus) => {
+    if (occupancyStatus === 'OCCUPIED' && SALE_STATUSES_REQUIRING_VACANT.includes(createForm.value.saleStatus)) {
+      createForm.value.saleStatus = 'NOT_FOR_SALE'
+    }
+  }
+)
+
 // Occupancy status — its own endpoint, separate from sale status below.
 const {
   open: showOccupancyStatus,
@@ -718,10 +805,27 @@ const {
 } = useTargetModal<Unit>()
 
 const occupancyStatusForm = ref<Record<string, any>>({})
-const occupancyStatusFields: FieldDef[] = [
-  { name: 'occupancyStatus', label: 'Occupancy status', type: 'select', required: true, options: OCCUPANCY_STATUS_OPTIONS },
+// A unit currently RESERVED/SOLD for sale can't be marked OCCUPIED — that
+// combination only comes back once the sale status is cleared first.
+const occupancyBlockedBySale = computed(() => {
+  const saleStatus = occupancyStatusTarget.value?.saleStatus
+  return saleStatus ? SALE_STATUSES_REQUIRING_VACANT.includes(saleStatus) : false
+})
+const occupancyStatusFields = computed<FieldDef[]>(() => [
+  {
+    name: 'occupancyStatus',
+    label: 'Occupancy status',
+    type: 'select',
+    required: true,
+    options: occupancyBlockedBySale.value
+      ? OCCUPANCY_STATUS_OPTIONS.filter((o) => o.value !== 'OCCUPIED')
+      : OCCUPANCY_STATUS_OPTIONS,
+    hint: occupancyBlockedBySale.value
+      ? `This unit is ${formatEnum(occupancyStatusTarget.value!.saleStatus!)} for sale, so it can't be marked Occupied.`
+      : undefined
+  },
   { name: 'reason' }
-]
+])
 
 watch(showOccupancyStatus, (value) => {
   if (value && occupancyStatusTarget.value) {
@@ -758,10 +862,22 @@ const {
 } = useTargetModal<Unit>()
 
 const saleStatusForm = ref<Record<string, any>>({})
-const saleStatusFields: FieldDef[] = [
-  { name: 'saleStatus', label: 'Sale status', type: 'select', required: true, options: SALE_STATUS_OPTIONS },
+// An OCCUPIED unit can't move its sale status to RESERVED/SOLD — those only
+// apply once the unit is VACANT.
+const saleBlockedByOccupancy = computed(() => saleStatusTarget.value?.occupancyStatus === 'OCCUPIED')
+const saleStatusFields = computed<FieldDef[]>(() => [
+  {
+    name: 'saleStatus',
+    label: 'Sale status',
+    type: 'select',
+    required: true,
+    options: saleBlockedByOccupancy.value
+      ? SALE_STATUS_OPTIONS.filter((o) => !SALE_STATUSES_REQUIRING_VACANT.includes(o.value))
+      : SALE_STATUS_OPTIONS,
+    hint: saleBlockedByOccupancy.value ? 'This unit is occupied, so it can\'t be marked Reserved or Sold for sale.' : undefined
+  },
   { name: 'reason' }
-]
+])
 
 watch(showSaleStatus, (value) => {
   if (value && saleStatusTarget.value) {
@@ -788,18 +904,59 @@ async function onSaleStatusSubmit(values: Record<string, any>) {
   }
 }
 
+// Maintenance status — its own endpoint, separate from occupancy/sale above.
+const {
+  open: showMaintenanceStatus,
+  target: maintenanceStatusTarget,
+  loading: maintenanceStatusLoading,
+  error: maintenanceStatusError,
+  openWith: openMaintenanceStatusWith
+} = useTargetModal<Unit>()
+
+const maintenanceStatusForm = ref<Record<string, any>>({})
+const maintenanceStatusFields: FieldDef[] = [
+  { name: 'maintenanceStatus', label: 'Maintenance status', type: 'select', required: true, options: MAINTENANCE_STATUS_OPTIONS },
+  { name: 'reason' }
+]
+
+watch(showMaintenanceStatus, (value) => {
+  if (value && maintenanceStatusTarget.value) {
+    maintenanceStatusForm.value = { maintenanceStatus: maintenanceStatusTarget.value.maintenanceStatus ?? undefined }
+  }
+})
+
+async function onMaintenanceStatusSubmit(values: Record<string, any>) {
+  if (!maintenanceStatusTarget.value) return
+  maintenanceStatusLoading.value = true
+  maintenanceStatusError.value = ''
+  try {
+    await updateMaintenanceStatus(maintenanceStatusTarget.value.id, {
+      maintenanceStatus: values.maintenanceStatus,
+      reason: values.reason || undefined
+    })
+    showMaintenanceStatus.value = false
+    toast.add({ title: 'Maintenance status updated', color: 'success' })
+    await load()
+  } catch (err) {
+    maintenanceStatusError.value = apiErrorMessage(err)
+  } finally {
+    maintenanceStatusLoading.value = false
+  }
+}
+
 onMounted(async () => {
   await loadUnitTypeOptions()
   await load()
 })
 watch(sort, load)
-watch(() => [filter.unitTypeId, filter.occupancyStatus, filter.saleStatus], load)
+watch(() => [filter.unitTypeId, filter.occupancyStatus, filter.saleStatus, filter.maintenanceStatus], load)
 
 const hasActiveFilter = computed(
   () =>
     filter.unitTypeId !== undefined ||
     filter.occupancyStatus !== undefined ||
     filter.saleStatus !== undefined ||
+    filter.maintenanceStatus !== undefined ||
     filter.unitNumber !== ''
 )
 
@@ -807,6 +964,7 @@ function clearFilters() {
   filter.unitTypeId = undefined
   filter.occupancyStatus = undefined
   filter.saleStatus = undefined
+  filter.maintenanceStatus = undefined
   filter.unitNumber = ''
   load()
 }
