@@ -1,12 +1,9 @@
-// Wraps the backend's (proposed) BuildingFacilityController
+// Wraps the backend's BuildingFacilityController
 // (/api/buildings/{buildingId}/facilities) — mirrors useUnitAmenities.ts but
 // scoped to a Building rather than a Unit. Shares the same Amenity catalog
 // (see useAmenities) as the reusable list of assignable items; a "facility"
 // is just an amenity assigned at the building level instead of (or in
 // addition to) the unit level, distinct from a unit's own UnitAmenity rows.
-//
-// NOTE: this backend endpoint doesn't exist yet — the frontend was built
-// ahead of it. Until it's added, calls here will 404.
 
 export interface BuildingFacility {
   id: number

@@ -59,7 +59,7 @@
       >
         <template #actions-data="{ row }">
           <div class="flex items-center gap-2">
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-pencil" @click.stop="openEdit(row)">
+            <UButton size="xs" color="primary" variant="soft" icon="i-lucide-pencil" @click.stop="openEdit(row)">
               Edit
             </UButton>
             <UButton size="xs" color="error" variant="soft" icon="i-lucide-trash-2" @click.stop="confirmDelete = row">

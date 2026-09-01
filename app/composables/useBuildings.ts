@@ -1,9 +1,5 @@
 // Wraps the backend's BuildingController (/api/buildings). Every building
 // belongs to a property.
-//
-// NOTE: `status` isn't a real backend field yet — same situation as
-// PropertyType in useProperties.ts. It'll round-trip as undefined until the
-// backend adds a matching column.
 
 export type BuildingStatus = 'ACTIVE' | 'UNDER_CONSTRUCTION' | 'RENOVATION' | 'INACTIVE'
 

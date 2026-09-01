@@ -13,20 +13,34 @@
 export default defineAppConfig({
   ui: {
     colors: {
-      primary: 'blue',
+      // "Blueprint" brand palette — a muted drafting-table blue instead of
+      // Tailwind's stock vibrant `blue`. Custom scale defined in main.css's
+      // `@theme` block (not a built-in Tailwind color name).
+      primary: 'blueprint',
       // `info` is used distinctly from `primary` (e.g. StatusBadge's
-      // PROCESSING state, dashboard "info" stat tiles) — left at its Nuxt UI
-      // default it's also blue, which would now read as identical to the
-      // brand accent. `cyan` keeps the "informational" feel without the
-      // collision.
-      info: 'cyan',
+      // PROCESSING state, dashboard "info" stat tiles) — `azure` is the
+      // Blueprint palette's lighter supporting blue, close enough in family
+      // to read as "the same world" as primary while staying visibly lighter
+      // so the two never collide on a badge or tile.
+      info: 'azure',
       // Used by StatusBadge for entities like REFUNDED/REVERSED — "reversed"
       // reads as its own thing, not a shade of neutral gray shared with
-      // CANCELLED.
+      // CANCELLED. Not part of the Blueprint pitch (which only reworked
+      // primary/info/cancelled) — left as the existing violet.
       secondary: 'violet',
       // Used by StatusBadge for CANCELLED — distinct from `warning`
-      // (PENDING) despite being an adjacent hue.
-      cancelled: 'orange'
+      // (PENDING) despite being an adjacent hue. `copper` is the Blueprint
+      // palette's warm accent (the pencil annotation to primary's ink).
+      cancelled: 'copper',
+      // `neutral` is what the vast majority of the app's buttons actually
+      // render in (`color="neutral" variant="soft"` is the default for every
+      // secondary action — Edit, Refresh, Filter, Manage, status changes,
+      // etc., ~3x more common than every other button color combined) — left
+      // at Nuxt UI's default `slate` it's pure achromatic gray with zero
+      // brand identity. `ink` carries the same hue as `blueprint` at low
+      // saturation, so it still reads as "just gray" at a glance but ties
+      // the whole app together on close look.
+      neutral: 'ink'
     },
     // The default panel-left-close/-open icons read as a generic window/code
     // glyph at the small size the collapsed sidebar's toggle renders at —

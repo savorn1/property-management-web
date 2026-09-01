@@ -53,7 +53,7 @@
             <UButton
               v-if="row.status === 'PENDING'"
               size="xs"
-              color="neutral"
+              color="primary"
               variant="soft"
               icon="i-lucide-pencil"
               @click.stop="openEdit(row)"

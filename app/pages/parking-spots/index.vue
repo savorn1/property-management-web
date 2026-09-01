@@ -51,7 +51,7 @@
               Assignments
             </UButton>
             <template v-if="isAdmin">
-              <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-pencil" @click="openEdit(row)">
+              <UButton size="xs" color="primary" variant="soft" icon="i-lucide-pencil" @click="openEdit(row)">
                 Edit
               </UButton>
               <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-shield" @click="openStatusWith(row)">

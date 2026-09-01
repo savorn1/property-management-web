@@ -65,7 +65,7 @@
           <div class="flex items-center gap-2">
             <UButton
               size="xs"
-              color="neutral"
+              color="primary"
               variant="soft"
               icon="i-lucide-pencil"
               :disabled="row.username === myUsername"

@@ -70,8 +70,8 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <StatTile label="Occupied" :value="fmt(occupancy?.occupiedUnits)" icon="i-lucide-door-closed" color="info" :loading="loading" to="/units?occupancyStatus=OCCUPIED" />
         <StatTile label="Available" :value="fmt(occupancy?.availableUnits)" icon="i-lucide-check-circle" color="success" :loading="loading" to="/units?occupancyStatus=VACANT" />
-        <StatTile label="Reserved" :value="fmt(occupancy?.reservedUnits)" icon="i-lucide-bookmark" color="warning" :loading="loading" to="/units?saleStatus=RESERVED" />
-        <StatTile label="Maintenance" :value="fmt(occupancy?.maintenanceUnits)" icon="i-lucide-wrench" color="warning" :loading="loading" to="/units?maintenanceStatus=MAINTENANCE" />
+        <StatTile label="Reserved" :value="fmt(occupancy?.reservedUnits)" icon="i-lucide-bookmark" color="warning" :loading="loading" to="/units?occupancyStatus=RESERVED" />
+        <StatTile label="Maintenance" :value="fmt(occupancy?.maintenanceUnits)" icon="i-lucide-wrench" color="warning" :loading="loading" to="/units?occupancyStatus=MAINTENANCE" />
         <StatTile label="Blocked" :value="fmt(occupancy?.unavailableUnits)" icon="i-lucide-ban" color="neutral" :loading="loading" to="/units" />
         <StatTile label="Occupancy rate" :value="occupancyRateLabel" icon="i-lucide-percent" color="primary" :loading="loading" />
       </div>

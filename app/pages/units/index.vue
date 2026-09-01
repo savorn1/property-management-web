@@ -25,12 +25,6 @@
           placeholder="Sale status"
           class="w-40"
         />
-        <USelect
-          v-model="filter.maintenanceStatus"
-          :items="maintenanceStatusFilterOptions"
-          placeholder="Maintenance"
-          class="w-40"
-        />
         <UInput
           v-model="filter.unitNumber"
           placeholder="Unit number"
@@ -73,36 +67,35 @@
         :row-number-start="(page - 1) * pageSize"
         @refresh="load"
       >
+        <!-- Each status column doubles as its own edit trigger — clicking the
+             badge opens the same modal the old dedicated button did, so the
+             actions column doesn't carry three buttons that just duplicate
+             the label already shown in the row. -->
+        <template #occupancyStatus-data="{ row }">
+          <button
+            type="button"
+            class="cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            title="Change occupancy status"
+            @click="openOccupancyStatusWith(row)"
+          >
+            <StatusBadge v-if="row.occupancyStatus" :status="row.occupancyStatus" />
+            <span v-else class="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">Set —</span>
+          </button>
+        </template>
+        <template #saleStatus-data="{ row }">
+          <button
+            type="button"
+            class="cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            title="Change sale status"
+            @click="openSaleStatusWith(row)"
+          >
+            <StatusBadge v-if="row.saleStatus" :status="row.saleStatus" />
+            <span v-else class="text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">Set —</span>
+          </button>
+        </template>
         <template #actions-data="{ row }">
           <div class="flex items-center gap-2">
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-door-open"
-              @click="openOccupancyStatusWith(row)"
-            >
-              Occupancy
-            </UButton>
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-tag"
-              @click="openSaleStatusWith(row)"
-            >
-              Sale status
-            </UButton>
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-wrench"
-              @click="openMaintenanceStatusWith(row)"
-            >
-              Maintenance
-            </UButton>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-pencil" @click="openEdit(row)">
+            <UButton size="xs" color="primary" variant="soft" icon="i-lucide-pencil" @click="openEdit(row)">
               Edit
             </UButton>
             <UButton size="xs" color="error" variant="soft" icon="i-lucide-trash-2" @click="confirmDelete = row">
@@ -193,21 +186,6 @@
           cancelable
           @submit="onSaleStatusSubmit"
           @cancel="showSaleStatus = false"
-        />
-      </template>
-    </UModal>
-
-    <UModal v-model:open="showMaintenanceStatus" :title="`Update maintenance status for unit '${maintenanceStatusTarget?.unitNumber ?? ''}'`">
-      <template #body>
-        <DynamicForm
-          v-model="maintenanceStatusForm"
-          :fields="maintenanceStatusFields"
-          :loading="maintenanceStatusLoading"
-          :error="maintenanceStatusError"
-          submit-label="Update"
-          cancelable
-          @submit="onMaintenanceStatusSubmit"
-          @cancel="showMaintenanceStatus = false"
         />
       </template>
     </UModal>
@@ -510,7 +488,6 @@
 import type { ColumnDef, FieldDef } from '#shared/types'
 import type {
   CreateUnitPayload,
-  UnitMaintenanceStatus,
   OccupancyStatus,
   SaleStatus,
   Unit,
@@ -532,7 +509,6 @@ const {
   update,
   updateOccupancyStatus,
   updateSaleStatus,
-  updateMaintenanceStatus,
   getStatusHistory,
   remove
 } = useUnits()
@@ -569,18 +545,15 @@ const error = ref('')
 const initialUnitTypeId = Number(route.query.unitTypeId) || undefined
 const initialOccupancyStatus = (route.query.occupancyStatus as OccupancyStatus | undefined) || undefined
 const initialSaleStatus = (route.query.saleStatus as SaleStatus | undefined) || undefined
-const initialMaintenanceStatus = (route.query.maintenanceStatus as UnitMaintenanceStatus | undefined) || undefined
 const filter = reactive<{
   unitTypeId: number | undefined
   occupancyStatus: OccupancyStatus | undefined
   saleStatus: SaleStatus | undefined
-  maintenanceStatus: UnitMaintenanceStatus | undefined
   unitNumber: string
 }>({
   unitTypeId: initialUnitTypeId,
   occupancyStatus: initialOccupancyStatus,
   saleStatus: initialSaleStatus,
-  maintenanceStatus: initialMaintenanceStatus,
   unitNumber: ''
 })
 
@@ -589,13 +562,16 @@ const unitTypeFilterOptions = computed(() => [{ label: 'All unit types', value: 
 
 const OCCUPANCY_STATUS_OPTIONS: { label: string; value: OccupancyStatus }[] = [
   { label: 'Vacant', value: 'VACANT' },
-  { label: 'Occupied', value: 'OCCUPIED' }
+  { label: 'Reserved', value: 'RESERVED' },
+  { label: 'Occupied', value: 'OCCUPIED' },
+  { label: 'Maintenance', value: 'MAINTENANCE' },
+  { label: 'Unavailable', value: 'UNAVAILABLE' }
 ]
 const occupancyStatusFilterOptions = [{ label: 'All occupancy', value: undefined }, ...OCCUPANCY_STATUS_OPTIONS]
 
 const SALE_STATUS_OPTIONS: { label: string; value: SaleStatus }[] = [
   { label: 'Not for sale', value: 'NOT_FOR_SALE' },
-  { label: 'Available', value: 'AVAILABLE' },
+  { label: 'For sale', value: 'FOR_SALE' },
   { label: 'Reserved', value: 'RESERVED' },
   { label: 'Sold', value: 'SOLD' }
 ]
@@ -605,12 +581,6 @@ const saleStatusFilterOptions = [{ label: 'All sale statuses', value: undefined 
 // past "just listed" — RESERVED/SOLD only apply to a VACANT unit. Enforced
 // client-side only (form option filtering), not on the backend.
 const SALE_STATUSES_REQUIRING_VACANT: SaleStatus[] = ['RESERVED', 'SOLD']
-
-const MAINTENANCE_STATUS_OPTIONS: { label: string; value: UnitMaintenanceStatus }[] = [
-  { label: 'Normal', value: 'NORMAL' },
-  { label: 'Maintenance', value: 'MAINTENANCE' }
-]
-const maintenanceStatusFilterOptions = [{ label: 'All maintenance', value: undefined }, ...MAINTENANCE_STATUS_OPTIONS]
 
 async function loadUnitTypeOptions() {
   const res = await listUnitTypes({ size: 200 })
@@ -633,7 +603,6 @@ const columns: ColumnDef<Unit>[] = [
   { key: 'buildingName', label: 'Building', value: (row) => row.buildingName ?? '—' },
   { key: 'occupancyStatus', label: 'Occupancy', type: 'status' },
   { key: 'saleStatus', label: 'Sale status', type: 'status' },
-  { key: 'maintenanceStatus', label: 'Maintenance', type: 'status' },
   { key: 'actions', label: '' }
 ]
 
@@ -645,7 +614,6 @@ async function load() {
       unitTypeId: filter.unitTypeId,
       occupancyStatus: filter.occupancyStatus,
       saleStatus: filter.saleStatus,
-      maintenanceStatus: filter.maintenanceStatus,
       unitNumber: filter.unitNumber || undefined,
       sortBy: sort.value?.column,
       sortOrder: sort.value?.direction,
@@ -694,7 +662,6 @@ const createFields = computed<FieldDef[]>(() => [
     wrapper: 'half',
     hint: createOccupancyBlocksSale.value ? 'Occupied units can\'t be Reserved or Sold for sale.' : undefined
   },
-  { name: 'maintenanceStatus', label: 'Maintenance status', type: 'select', options: MAINTENANCE_STATUS_OPTIONS, default: 'NORMAL', wrapper: 'half' },
   { name: 'view', type: 'select', options: VIEW_OPTIONS, wrapper: 'half' },
   { name: 'orientation', type: 'select', options: ORIENTATION_OPTIONS, wrapper: 'half' },
   { name: 'kitchen', type: 'switch', onLabel: 'Yes', offLabel: 'No' },
@@ -743,8 +710,7 @@ const {
     createDefaults: () => ({
       unitTypeId: filter.unitTypeId,
       occupancyStatus: 'VACANT',
-      saleStatus: 'NOT_FOR_SALE',
-      maintenanceStatus: 'NORMAL'
+      saleStatus: 'NOT_FOR_SALE'
     }),
     toForm: (row) => ({
       unitNumber: row.unitNumber,
@@ -762,7 +728,6 @@ const {
       name: values.name || undefined,
       occupancyStatus: values.occupancyStatus,
       saleStatus: values.saleStatus,
-      maintenanceStatus: values.maintenanceStatus,
       view: values.view || undefined,
       orientation: values.orientation || undefined,
       kitchen: values.kitchen,
@@ -904,59 +869,18 @@ async function onSaleStatusSubmit(values: Record<string, any>) {
   }
 }
 
-// Maintenance status — its own endpoint, separate from occupancy/sale above.
-const {
-  open: showMaintenanceStatus,
-  target: maintenanceStatusTarget,
-  loading: maintenanceStatusLoading,
-  error: maintenanceStatusError,
-  openWith: openMaintenanceStatusWith
-} = useTargetModal<Unit>()
-
-const maintenanceStatusForm = ref<Record<string, any>>({})
-const maintenanceStatusFields: FieldDef[] = [
-  { name: 'maintenanceStatus', label: 'Maintenance status', type: 'select', required: true, options: MAINTENANCE_STATUS_OPTIONS },
-  { name: 'reason' }
-]
-
-watch(showMaintenanceStatus, (value) => {
-  if (value && maintenanceStatusTarget.value) {
-    maintenanceStatusForm.value = { maintenanceStatus: maintenanceStatusTarget.value.maintenanceStatus ?? undefined }
-  }
-})
-
-async function onMaintenanceStatusSubmit(values: Record<string, any>) {
-  if (!maintenanceStatusTarget.value) return
-  maintenanceStatusLoading.value = true
-  maintenanceStatusError.value = ''
-  try {
-    await updateMaintenanceStatus(maintenanceStatusTarget.value.id, {
-      maintenanceStatus: values.maintenanceStatus,
-      reason: values.reason || undefined
-    })
-    showMaintenanceStatus.value = false
-    toast.add({ title: 'Maintenance status updated', color: 'success' })
-    await load()
-  } catch (err) {
-    maintenanceStatusError.value = apiErrorMessage(err)
-  } finally {
-    maintenanceStatusLoading.value = false
-  }
-}
-
 onMounted(async () => {
   await loadUnitTypeOptions()
   await load()
 })
 watch(sort, load)
-watch(() => [filter.unitTypeId, filter.occupancyStatus, filter.saleStatus, filter.maintenanceStatus], load)
+watch(() => [filter.unitTypeId, filter.occupancyStatus, filter.saleStatus], load)
 
 const hasActiveFilter = computed(
   () =>
     filter.unitTypeId !== undefined ||
     filter.occupancyStatus !== undefined ||
     filter.saleStatus !== undefined ||
-    filter.maintenanceStatus !== undefined ||
     filter.unitNumber !== ''
 )
 
@@ -964,7 +888,6 @@ function clearFilters() {
   filter.unitTypeId = undefined
   filter.occupancyStatus = undefined
   filter.saleStatus = undefined
-  filter.maintenanceStatus = undefined
   filter.unitNumber = ''
   load()
 }

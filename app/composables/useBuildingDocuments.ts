@@ -1,9 +1,6 @@
-// Wraps the backend's (proposed) BuildingDocumentController
+// Wraps the backend's BuildingDocumentController
 // (/api/buildings/{buildingId}/documents). Same shape as usePropertyDocuments
 // / useUnitDocuments — see that comment for the multipart upload pattern.
-//
-// NOTE: this backend endpoint doesn't exist yet — same situation as
-// useBuildingFacilities.ts. Calls here will 404 until it's added.
 
 export interface BuildingDocument {
   id: number

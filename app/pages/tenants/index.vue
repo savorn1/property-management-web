@@ -80,7 +80,7 @@
             <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-folder" @click="openDocumentsWith(row)">
               Documents
             </UButton>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-pencil" @click="openEdit(row)">
+            <UButton size="xs" color="primary" variant="soft" icon="i-lucide-pencil" @click="openEdit(row)">
               Edit
             </UButton>
             <UButton size="xs" color="error" variant="soft" icon="i-lucide-trash-2" @click="confirmDelete = row">

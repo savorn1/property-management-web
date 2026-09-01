@@ -1,6 +1,12 @@
 <template>
   <UDashboardGroup class="bg-gray-50 dark:bg-gray-950">
-    <UDashboardSidebar collapsible :collapsed-size="4" class="bg-white dark:bg-gray-900">
+    <!-- Deliberately always dark, independent of the app's own light/dark
+         toggle — the `dark` class forces every Nuxt UI component inside
+         (nav items, icons, the collapse button) onto its dark-mode tokens
+         regardless of the outer mode, so this doesn't need per-component
+         overrides. Gives the Blueprint palette's deep ink-blue a constant,
+         prominent presence rather than just tinting a few accents. -->
+    <UDashboardSidebar collapsible :collapsed-size="4" class="dark bg-blueprint-950 border-blueprint-900">
       <template #header="{ collapsed }">
         <NuxtLink to="/" class="flex items-center gap-2.5" :class="collapsed ? 'justify-center w-full' : ''">
           <span
@@ -68,34 +74,65 @@ const profileItems = computed<DropdownMenuItem[][]>(() => [
   [{ label: 'Log out', icon: 'i-lucide-log-out', color: 'error', onSelect: () => logout() }]
 ])
 
-// Add more feature nav items here as pages are built (e.g. Maintenance,
-// Invoices). The Administration section stays admin-only.
+// Grouped to match the app's own domain flow — Property -> Rental / Sales
+// (siblings off the same unit), Billing cross-cuts both, then Operations and
+// Accounting as their own concerns. Add new feature nav items to the group
+// they belong to; the Accounting/Administration groups stay admin-only.
+//
+// Base (always-visible) items are read-open to any authenticated user —
+// write actions are gated inline within each page — except where a whole
+// page requires ADMIN even to view; those extra items are appended per group
+// inside an isAdmin check rather than broken out into their own group, so
+// e.g. "Operations" reads as one section instead of splitting across two
+// places in the list.
 const items = computed<NavigationMenuItem[]>(() => [
   { label: 'Dashboard', to: '/', icon: 'i-lucide-layout-dashboard' },
+
+  { label: 'Property', type: 'label' as const },
   { label: 'Properties', to: '/properties', icon: 'i-lucide-building' },
   { label: 'Buildings', to: '/buildings', icon: 'i-lucide-building-2' },
   { label: 'Floors', to: '/floors', icon: 'i-lucide-layers' },
   { label: 'Unit types', to: '/unit-types', icon: 'i-lucide-layout-grid' },
   { label: 'Units', to: '/units', icon: 'i-lucide-door-open' },
+  ...(isAdmin.value
+    ? [
+        { label: 'Zones', to: '/zones', icon: 'i-lucide-map' },
+        { label: 'Amenities', to: '/amenities', icon: 'i-lucide-sparkles' }
+      ]
+    : []),
+
+  { label: 'Rental', type: 'label' as const },
   { label: 'Tenants', to: '/tenants', icon: 'i-lucide-user-round' },
   { label: 'Leases', to: '/leases', icon: 'i-lucide-file-signature' },
   { label: 'Move-in requests', to: '/move-in', icon: 'i-lucide-log-in' },
   { label: 'Move-out requests', to: '/move-out', icon: 'i-lucide-log-out' },
+
+  { label: 'Sales', type: 'label' as const },
   { label: 'Buyers', to: '/buyers', icon: 'i-lucide-handshake' },
   { label: 'Leads', to: '/leads', icon: 'i-lucide-contact' },
   { label: 'Sale listings', to: '/sale-listings', icon: 'i-lucide-tag' },
   { label: 'Sale reservations', to: '/sale-reservations', icon: 'i-lucide-bookmark' },
   { label: 'Sale agreements', to: '/sale-agreements', icon: 'i-lucide-file-signature' },
+  ...(isAdmin.value ? [{ label: 'Sales agents', to: '/sales-agents', icon: 'i-lucide-user-round' }] : []),
+
+  { label: 'Billing', type: 'label' as const },
   { label: 'Invoices', to: '/invoices', icon: 'i-lucide-receipt' },
   { label: 'Payments', to: '/payments', icon: 'i-lucide-banknote' },
   { label: 'Receipts', to: '/receipts', icon: 'i-lucide-receipt-text' },
-  // Read-open to any authenticated user (write actions are gated inline within
-  // each page) — kept outside the isAdmin block below so USER-role staff can
-  // still find them, unlike the pages that follow which require ADMIN even to view.
+
+  { label: 'Operations', type: 'label' as const },
   { label: 'Maintenance', to: '/maintenance', icon: 'i-lucide-wrench' },
   { label: 'Meters', to: '/meters', icon: 'i-lucide-gauge' },
   { label: 'Utility bills', to: '/utility-bills', icon: 'i-lucide-zap' },
   { label: 'Parking spots', to: '/parking-spots', icon: 'i-lucide-square-parking' },
+  ...(isAdmin.value
+    ? [
+        { label: 'Vendors', to: '/vendors', icon: 'i-lucide-truck' },
+        { label: 'Technicians', to: '/technicians', icon: 'i-lucide-hard-hat' },
+        { label: 'Spare parts', to: '/spare-parts', icon: 'i-lucide-cog' }
+      ]
+    : []),
+
   ...(isAdmin.value
     ? [
         { label: 'Accounting', type: 'label' as const },
@@ -110,15 +147,6 @@ const items = computed<NavigationMenuItem[]>(() => [
         { label: 'Expenses', to: '/expenses', icon: 'i-lucide-wallet' },
         { label: 'Loans', to: '/loans', icon: 'i-lucide-landmark' },
         { label: 'Payables', to: '/payables', icon: 'i-lucide-file-text' },
-        { label: 'Sales', type: 'label' as const },
-        { label: 'Sales agents', to: '/sales-agents', icon: 'i-lucide-user-round' },
-        { label: 'Property setup', type: 'label' as const },
-        { label: 'Zones', to: '/zones', icon: 'i-lucide-map' },
-        { label: 'Amenities', to: '/amenities', icon: 'i-lucide-sparkles' },
-        { label: 'Operations', type: 'label' as const },
-        { label: 'Vendors', to: '/vendors', icon: 'i-lucide-truck' },
-        { label: 'Technicians', to: '/technicians', icon: 'i-lucide-hard-hat' },
-        { label: 'Spare parts', to: '/spare-parts', icon: 'i-lucide-cog' },
         { label: 'Administration', type: 'label' as const },
         { label: 'Users', to: '/users', icon: 'i-lucide-users' }
       ]

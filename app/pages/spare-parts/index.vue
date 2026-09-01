@@ -63,7 +63,7 @@
             >
               Adjust stock
             </UButton>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-pencil" @click.stop="openEdit(row)">
+            <UButton size="xs" color="primary" variant="soft" icon="i-lucide-pencil" @click.stop="openEdit(row)">
               Edit
             </UButton>
             <UButton

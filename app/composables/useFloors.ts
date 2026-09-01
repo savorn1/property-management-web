@@ -1,11 +1,5 @@
 // Wraps the backend's FloorController (/api/floors). Every floor belongs to
 // a building.
-//
-// NOTE: `status` isn't a real backend field yet — checked against the live
-// backend's /v3/api-docs, which confirmed it's absent (same situation as
-// BuildingStatus in useBuildings.ts, whose shape this mirrors for consistency
-// even though the one status-like field verified to exist in this backend,
-// Zone.active, is actually a boolean with its own PUT /status endpoint).
 
 export type FloorStatus = 'ACTIVE' | 'UNDER_CONSTRUCTION' | 'RENOVATION' | 'INACTIVE'
 
