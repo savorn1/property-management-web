@@ -30,13 +30,16 @@
       :title="error"
       icon="i-lucide-triangle-alert"
     />
+    <TruncatedResultsAlert v-if="truncated" />
 
     <UCard>
       <DataTable
         v-model:sort="sort"
+        v-model:selected="selected"
         :rows="pagedRows"
         :columns="columns"
         :loading="loading"
+        :selectable="isAdmin"
         refreshable
         numbered
         exportable
@@ -44,10 +47,42 @@
         :row-number-start="(page - 1) * pageSize"
         @refresh="load"
       >
+        <template v-if="isAdmin" #bulk-actions="{ selected: sel, clear }">
+          <UButton
+            v-if="eligibleForLateFee(sel).length > 0"
+            size="xs"
+            color="warning"
+            variant="soft"
+            icon="i-lucide-alarm-clock"
+            @click="openBulkLateFee(sel, clear)"
+          >
+            Apply late fee ({{ eligibleForLateFee(sel).length }})
+          </UButton>
+          <UButton
+            v-if="eligibleForCancel(sel).length > 0"
+            size="xs"
+            color="error"
+            variant="soft"
+            icon="i-lucide-ban"
+            @click="openBulkCancel(sel, clear)"
+          >
+            Cancel ({{ eligibleForCancel(sel).length }})
+          </UButton>
+        </template>
         <template #actions-data="{ row }">
           <div class="flex flex-wrap items-center gap-2">
             <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-eye" @click="openDetailsWith(row)">
               Details
+            </UButton>
+            <UButton
+              size="xs"
+              color="neutral"
+              variant="soft"
+              icon="i-lucide-file-down"
+              :loading="downloadingPdfId === row.id"
+              @click="onDownloadPdf(row)"
+            >
+              PDF
             </UButton>
             <template v-if="isAdmin">
               <UButton
@@ -142,6 +177,28 @@
       :loading="applyingLateFee"
       @update:model-value="(v: boolean) => { if (!v) lateFeeTarget = null }"
       @confirm="onLateFeeConfirm"
+    />
+
+    <ConfirmModal
+      :model-value="bulkLateFeeTargets.length > 0"
+      title="Apply late fee"
+      :description="`Apply the configured late fee to ${bulkLateFeeTargets.length} overdue invoice${bulkLateFeeTargets.length === 1 ? '' : 's'}?`"
+      confirm-label="Apply late fee"
+      color="warning"
+      :loading="bulkApplyingLateFee"
+      @update:model-value="(v: boolean) => { if (!v) { bulkLateFeeTargets = []; bulkLateFeeClear = null } }"
+      @confirm="onBulkLateFeeConfirm"
+    />
+
+    <ConfirmModal
+      :model-value="bulkCancelTargets.length > 0"
+      title="Cancel invoices"
+      :description="`Cancel ${bulkCancelTargets.length} invoice${bulkCancelTargets.length === 1 ? '' : 's'}? This cannot be undone.`"
+      confirm-label="Cancel invoices"
+      color="error"
+      :loading="bulkCancelling"
+      @update:model-value="(v: boolean) => { if (!v) { bulkCancelTargets = []; bulkCancelClear = null } }"
+      @confirm="onBulkCancelConfirm"
     />
 
     <UModal v-model:open="showRecordPayment" :title="`Record payment · ${recordPaymentTarget?.tenantName ?? ''} — Unit ${recordPaymentTarget?.unitNumber ?? ''}`">
@@ -312,6 +369,7 @@ import type { CreateRefundPayload, Refund } from '~/composables/useRefunds'
 
 const { isAdmin } = useAuth()
 const { list, create, cancel, applyLateFee, listPayments, createPayment } = useInvoices()
+const { downloadInvoicePdf } = useDocumentPdf()
 const { list: listLeases } = useLeases()
 const { list: listCreditNotes, create: createCreditNote } = useCreditNotes()
 const { list: listDebitNotes, create: createDebitNote } = useDebitNotes()
@@ -321,6 +379,7 @@ const toast = useToast()
 const rows = ref<Invoice[]>([])
 const loading = ref(false)
 const error = ref('')
+const selected = ref<Invoice[]>([])
 
 const filter = reactive<{ leaseId: number | undefined; status: InvoiceStatus | undefined }>({
   leaseId: undefined,
@@ -358,7 +417,7 @@ const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   direction: 'desc'
 })
 
-const { page, pageSize, total, rows: pagedRows } = useClientTable(rows, { pageSize: 10 })
+const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
 
 const columns: ColumnDef<Invoice>[] = [
   { key: 'tenantName', label: 'Tenant', value: (row) => row.tenantName ?? '—' },
@@ -522,6 +581,23 @@ async function onRecordPaymentSubmit(values: Record<string, any>) {
     recordPaymentError.value = apiErrorMessage(err)
   } finally {
     recordPaymentLoading.value = false
+  }
+}
+
+// Download PDF — fetches this invoice's payments fresh (not reusing the
+// Details modal's cache, since that may never have been opened) and lays
+// them out as a single printable document, separate from DataTable's own
+// bulk row export.
+const downloadingPdfId = ref<number | null>(null)
+async function onDownloadPdf(row: Invoice) {
+  downloadingPdfId.value = row.id
+  try {
+    const payments = await listPayments(row.id)
+    await downloadInvoicePdf(row, payments)
+  } catch (err) {
+    toast.add({ title: 'Could not generate PDF', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    downloadingPdfId.value = null
   }
 }
 
@@ -700,18 +776,90 @@ async function onProcessRefund(refund: Refund) {
   }
 }
 
+// Bulk apply-late-fee / cancel — same single-item endpoints as the per-row
+// actions, looped over the eligible subset of the selection (no dedicated
+// bulk endpoint exists). "Eligible" mirrors each per-row button's own v-if.
+function eligibleForLateFee(list: Invoice[]) {
+  return list.filter((i) => (i.status === 'PENDING' || i.status === 'PARTIALLY_PAID') && i.overdue)
+}
+function eligibleForCancel(list: Invoice[]) {
+  return list.filter((i) => i.status !== 'CANCELLED' && i.status !== 'PAID')
+}
+
+const bulkLateFeeTargets = ref<Invoice[]>([])
+const bulkLateFeeClear = ref<(() => void) | null>(null)
+const bulkApplyingLateFee = ref(false)
+function openBulkLateFee(sel: Invoice[], clear: () => void) {
+  const targets = eligibleForLateFee(sel)
+  if (targets.length === 0) return
+  bulkLateFeeTargets.value = targets
+  bulkLateFeeClear.value = clear
+}
+async function onBulkLateFeeConfirm() {
+  const targets = bulkLateFeeTargets.value
+  bulkApplyingLateFee.value = true
+  const results = await Promise.allSettled(targets.map((i) => applyLateFee(i.id)))
+  const failed = results.filter((r) => r.status === 'rejected').length
+  bulkApplyingLateFee.value = false
+  bulkLateFeeTargets.value = []
+  bulkLateFeeClear.value?.()
+  bulkLateFeeClear.value = null
+  toast.add({
+    title:
+      failed === 0
+        ? `Applied late fee to ${targets.length} invoice${targets.length === 1 ? '' : 's'}`
+        : `Applied late fee to ${targets.length - failed} of ${targets.length} invoices`,
+    description: failed > 0 ? `${failed} failed` : undefined,
+    color: failed === 0 ? 'success' : 'warning'
+  })
+  await load()
+}
+
+const bulkCancelTargets = ref<Invoice[]>([])
+const bulkCancelClear = ref<(() => void) | null>(null)
+const bulkCancelling = ref(false)
+function openBulkCancel(sel: Invoice[], clear: () => void) {
+  const targets = eligibleForCancel(sel)
+  if (targets.length === 0) return
+  bulkCancelTargets.value = targets
+  bulkCancelClear.value = clear
+}
+async function onBulkCancelConfirm() {
+  const targets = bulkCancelTargets.value
+  bulkCancelling.value = true
+  const results = await Promise.allSettled(targets.map((i) => cancel(i.id)))
+  const failed = results.filter((r) => r.status === 'rejected').length
+  bulkCancelling.value = false
+  bulkCancelTargets.value = []
+  bulkCancelClear.value?.()
+  bulkCancelClear.value = null
+  toast.add({
+    title:
+      failed === 0
+        ? `Cancelled ${targets.length} invoice${targets.length === 1 ? '' : 's'}`
+        : `Cancelled ${targets.length - failed} of ${targets.length} invoices`,
+    description: failed > 0 ? `${failed} failed` : undefined,
+    color: failed === 0 ? 'success' : 'warning'
+  })
+  await load()
+}
+
 onMounted(async () => {
   await loadOptions()
   await load()
 })
 watch(sort, load)
-watch(() => [filter.leaseId, filter.status], load)
+watch(() => [filter.leaseId, filter.status], () => {
+  selected.value = []
+  load()
+})
 
 const hasActiveFilter = computed(() => filter.leaseId !== undefined || filter.status !== undefined)
 
 function clearFilters() {
   filter.leaseId = undefined
   filter.status = undefined
+  selected.value = []
   load()
 }
 </script>

@@ -30,13 +30,16 @@
       :title="error"
       icon="i-lucide-triangle-alert"
     />
+    <TruncatedResultsAlert v-if="truncated" />
 
     <UCard>
       <DataTable
         v-model:sort="sort"
+        v-model:selected="selected"
         :rows="pagedRows"
         :columns="columns"
         :loading="loading"
+        :selectable="isAdmin"
         refreshable
         numbered
         exportable
@@ -44,6 +47,18 @@
         :row-number-start="(page - 1) * pageSize"
         @refresh="load"
       >
+        <template v-if="isAdmin" #bulk-actions="{ selected: sel, clear }">
+          <UButton
+            v-if="pendingIn(sel).length > 0"
+            size="xs"
+            color="success"
+            icon="i-lucide-check"
+            :loading="bulkMarkPaidLoading"
+            @click="openBulkMarkPaid(sel, clear)"
+          >
+            Mark {{ pendingIn(sel).length }} as paid
+          </UButton>
+        </template>
         <template #actions-data="{ row }">
           <div class="flex items-center gap-2">
             <UButton
@@ -107,6 +122,17 @@
       @update:model-value="(v: boolean) => { if (!v) markPaidTarget = null }"
       @confirm="onMarkPaidConfirm"
     />
+
+    <ConfirmModal
+      :model-value="bulkMarkPaidTargets.length > 0"
+      title="Mark bills as paid"
+      :description="`Mark ${bulkMarkPaidTargets.length} bill${bulkMarkPaidTargets.length === 1 ? '' : 's'} as paid?`"
+      confirm-label="Mark paid"
+      color="success"
+      :loading="bulkMarkPaidLoading"
+      @update:model-value="(v: boolean) => { if (!v) { bulkMarkPaidTargets = []; bulkMarkPaidClear = null } }"
+      @confirm="onBulkMarkPaidConfirm"
+    />
   </div>
 </template>
 
@@ -123,6 +149,7 @@ const toast = useToast()
 const rows = ref<UtilityBill[]>([])
 const loading = ref(false)
 const error = ref('')
+const selected = ref<UtilityBill[]>([])
 
 const initialStatus = (route.query.status as UtilityBillStatus | undefined) || undefined
 const filter = reactive<{ meterId: number | undefined; status: UtilityBillStatus | undefined }>({
@@ -152,7 +179,7 @@ const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   direction: 'desc'
 })
 
-const { page, pageSize, total, rows: pagedRows } = useClientTable(rows, { pageSize: 10 })
+const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
 
 const columns: ColumnDef<UtilityBill>[] = [
   { key: 'meterNumber', label: 'Meter', value: (row) => row.meterNumber ?? '—' },
@@ -241,18 +268,56 @@ async function onMarkPaidConfirm() {
   }
 }
 
+// Bulk mark-paid — same single-item updateStatus endpoint as the per-row
+// action, just looped over the selection (no dedicated bulk endpoint exists).
+function pendingIn(list: UtilityBill[]) {
+  return list.filter((b) => b.status === 'PENDING')
+}
+const bulkMarkPaidTargets = ref<UtilityBill[]>([])
+const bulkMarkPaidClear = ref<(() => void) | null>(null)
+const bulkMarkPaidLoading = ref(false)
+function openBulkMarkPaid(sel: UtilityBill[], clear: () => void) {
+  const targets = pendingIn(sel)
+  if (targets.length === 0) return
+  bulkMarkPaidTargets.value = targets
+  bulkMarkPaidClear.value = clear
+}
+async function onBulkMarkPaidConfirm() {
+  const targets = bulkMarkPaidTargets.value
+  bulkMarkPaidLoading.value = true
+  const results = await Promise.allSettled(targets.map((b) => updateStatus(b.id, 'PAID')))
+  const failed = results.filter((r) => r.status === 'rejected').length
+  bulkMarkPaidLoading.value = false
+  bulkMarkPaidTargets.value = []
+  bulkMarkPaidClear.value?.()
+  bulkMarkPaidClear.value = null
+  toast.add({
+    title:
+      failed === 0
+        ? `Marked ${targets.length} bill${targets.length === 1 ? '' : 's'} as paid`
+        : `Marked ${targets.length - failed} of ${targets.length} bills as paid`,
+    description: failed > 0 ? `${failed} failed` : undefined,
+    color: failed === 0 ? 'success' : 'warning'
+  })
+  await load()
+}
+
 onMounted(async () => {
   await loadOptions()
   await load()
 })
 watch(sort, load)
-watch(() => [filter.meterId, filter.status], load)
+watch(() => [filter.meterId, filter.status], () => {
+  selected.value = []
+  load()
+})
 
 const hasActiveFilter = computed(() => filter.meterId !== undefined || filter.status !== undefined)
 
 function clearFilters() {
   filter.meterId = undefined
   filter.status = undefined
+  selected.value = []
   load()
 }
 </script>

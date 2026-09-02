@@ -37,6 +37,7 @@
           </template>
 
           <template #right>
+            <AlertsBell />
             <UColorModeButton />
             <UDropdownMenu :items="profileItems" :content="{ align: 'end' }" :ui="{ content: 'w-56' }">
               <UButton size="sm" color="neutral" variant="ghost" trailing-icon="i-lucide-chevron-down">

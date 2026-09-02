@@ -25,6 +25,7 @@
     </UCard>
 
     <UAlert v-if="error" color="error" variant="subtle" class="mb-4" :title="error" icon="i-lucide-triangle-alert" />
+    <TruncatedResultsAlert v-if="truncated" />
 
     <UCard>
       <DataTable
@@ -308,7 +309,7 @@ const STATUS_OPTIONS: { label: string; value: LeadStatus }[] = [
 const statusFilterOptions = [{ label: 'All statuses', value: undefined }, ...STATUS_OPTIONS]
 
 const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({ column: 'id', direction: 'desc' })
-const { page, pageSize, total, rows: pagedRows } = useClientTable(rows, { pageSize: 10 })
+const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
 
 const columns: ColumnDef<Lead>[] = [
   { key: 'fullName', label: 'Name' },

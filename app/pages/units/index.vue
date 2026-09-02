@@ -53,6 +53,7 @@
       :title="error"
       icon="i-lucide-triangle-alert"
     />
+    <TruncatedResultsAlert v-if="truncated" />
 
     <UCard>
       <DataTable
@@ -580,7 +581,7 @@ const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   direction: 'asc'
 })
 
-const { page, pageSize, total, rows: pagedRows } = useClientTable(rows, { pageSize: 10 })
+const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
 
 const columns: ColumnDef<Unit>[] = [
   { key: 'unitNumber', label: 'Unit #', sortable: true },

@@ -37,6 +37,7 @@
       :title="error"
       icon="i-lucide-triangle-alert"
     />
+    <TruncatedResultsAlert v-if="truncated" />
 
     <UCard>
       <DataTable
@@ -51,6 +52,18 @@
         :row-number-start="(page - 1) * pageSize"
         @refresh="load"
       >
+        <template #actions-data="{ row }">
+          <UButton
+            size="xs"
+            color="neutral"
+            variant="soft"
+            icon="i-lucide-file-down"
+            :loading="downloadingPdfId === row.id"
+            @click="onDownloadPdf(row)"
+          >
+            PDF
+          </UButton>
+        </template>
         <template #empty-state>
           <EmptyState
             v-if="hasActiveFilter"
@@ -78,6 +91,8 @@ import type { ColumnDef } from '#shared/types'
 import type { Receipt, ReceiptSourceType } from '~/composables/useReceipts'
 
 const { list } = useReceipts()
+const { downloadReceiptPdf } = useDocumentPdf()
+const toast = useToast()
 
 const rows = ref<Receipt[]>([])
 const loading = ref(false)
@@ -101,7 +116,7 @@ const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   direction: 'desc'
 })
 
-const { page, pageSize, total, rows: pagedRows } = useClientTable(rows, { pageSize: 10 })
+const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
 
 const columns: ColumnDef<Receipt>[] = [
   { key: 'receiptNumber', label: 'Receipt #' },
@@ -112,8 +127,21 @@ const columns: ColumnDef<Receipt>[] = [
   { key: 'paymentDate', label: 'Payment date', type: 'date' },
   { key: 'method', type: 'enum' },
   { key: 'referenceNumber', label: 'Reference', value: (row) => row.referenceNumber ?? '—' },
-  { key: 'issuedAt', label: 'Issued', type: 'datetime' }
+  { key: 'issuedAt', label: 'Issued', type: 'datetime' },
+  { key: 'actions', label: '' }
 ]
+
+const downloadingPdfId = ref<number | null>(null)
+async function onDownloadPdf(row: Receipt) {
+  downloadingPdfId.value = row.id
+  try {
+    await downloadReceiptPdf(row)
+  } catch (err) {
+    toast.add({ title: 'Could not generate PDF', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    downloadingPdfId.value = null
+  }
+}
 
 async function load() {
   loading.value = true
