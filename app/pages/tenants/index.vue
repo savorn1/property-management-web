@@ -8,26 +8,17 @@
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
         <UInput
-          v-model="filter.fullName"
-          placeholder="Search name"
+          v-model="search"
+          placeholder="Search name or email"
           icon="i-lucide-search"
           class="w-56"
-          @keyup.enter="load"
-        />
-        <UInput
-          v-model="filter.email"
-          placeholder="Email"
-          icon="i-lucide-mail"
-          class="w-56"
-          @keyup.enter="load"
         />
         <USelect
           v-model="filter.status"
           :items="statusFilterOptions"
           placeholder="Status"
-          class="w-40"
+          class="w-32"
         />
-        <UButton size="sm" color="neutral" variant="soft" icon="i-lucide-search" @click="load">Search</UButton>
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -65,29 +56,7 @@
         @refresh="load"
       >
         <template #actions-data="{ row }">
-          <div class="flex items-center gap-2">
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-file-signature"
-              @click="navigateTo(`/leases?tenantId=${row.id}`)"
-            >
-              Leases
-            </UButton>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-shield" @click="openStatusWith(row)">
-              Status
-            </UButton>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-folder" @click="openDocumentsWith(row)">
-              Documents
-            </UButton>
-            <UButton size="xs" color="primary" variant="soft" icon="i-lucide-pencil" @click="openEdit(row)">
-              Edit
-            </UButton>
-            <UButton size="xs" color="error" variant="soft" icon="i-lucide-trash-2" @click="confirmDelete = row">
-              Delete
-            </UButton>
-          </div>
+          <RowActions :actions="tenantActions(row)" />
         </template>
         <template #empty-state>
           <EmptyState
@@ -206,7 +175,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ColumnDef, FieldDef } from '#shared/types'
+import type { ColumnDef, FieldDef, RowAction } from '#shared/types'
 import type { Tenant, TenantPayload, TenantStatus } from '~/composables/useTenants'
 import type { TenantDocument } from '~/composables/useTenantDocuments'
 
@@ -221,9 +190,7 @@ const loading = ref(false)
 const error = ref('')
 
 const initialStatus = (route.query.status as TenantStatus | undefined) || undefined
-const filter = reactive<{ fullName: string; email: string; status: TenantStatus | undefined }>({
-  fullName: '',
-  email: '',
+const filter = reactive<{ status: TenantStatus | undefined }>({
   status: initialStatus
 })
 
@@ -239,7 +206,10 @@ const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   direction: 'desc'
 })
 
-const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
+const { page, pageSize, total, rows: pagedRows, truncated, search } = useClientTable(rows, {
+  pageSize: 10,
+  searchFields: ['fullName', 'email']
+})
 
 const columns: ColumnDef<Tenant>[] = [
   { key: 'fullName', label: 'Name', sortable: true },
@@ -254,8 +224,6 @@ async function load() {
   error.value = ''
   try {
     const res = await list({
-      fullName: filter.fullName || undefined,
-      email: filter.email || undefined,
       status: filter.status,
       sortBy: sort.value?.column,
       sortOrder: sort.value?.direction,
@@ -421,13 +389,22 @@ watch(sort, load)
 watch(() => filter.status, load)
 
 const hasActiveFilter = computed(
-  () => filter.fullName !== '' || filter.email !== '' || filter.status !== undefined
+  () => search.value !== '' || filter.status !== undefined
 )
 
 function clearFilters() {
-  filter.fullName = ''
-  filter.email = ''
+  search.value = ''
   filter.status = undefined
   load()
+}
+
+function tenantActions(row: Tenant): RowAction[] {
+  return [
+    { label: 'Leases', icon: 'i-lucide-file-signature', onClick: () => navigateTo(`/leases?tenantId=${row.id}`) },
+    { label: 'Edit', icon: 'i-lucide-pencil', color: 'primary', onClick: () => openEdit(row) },
+    { label: 'Delete', icon: 'i-lucide-trash-2', color: 'error', onClick: () => (confirmDelete.value = row) },
+    { label: 'Status', icon: 'i-lucide-shield', onClick: () => openStatusWith(row) },
+    { label: 'Documents', icon: 'i-lucide-folder', onClick: () => openDocumentsWith(row) }
+  ]
 }
 </script>

@@ -7,9 +7,9 @@
 
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
-        <USelect v-model="filter.tenantId" :items="tenantFilterOptions" placeholder="Tenant" class="w-56" />
-        <USelect v-model="filter.unitId" :items="unitFilterOptions" placeholder="Unit" class="w-56" />
-        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-44" />
+        <USelect v-model="filter.tenantId" :items="tenantFilterOptions" placeholder="Tenant" class="w-48" />
+        <USelect v-model="filter.unitId" :items="unitFilterOptions" placeholder="Unit" class="w-48" />
+        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-36" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -47,41 +47,7 @@
         @refresh="load"
       >
         <template #actions-data="{ row }">
-          <div class="flex flex-wrap items-center gap-2">
-            <UButton
-              v-if="row.status === 'PENDING_APPROVAL'"
-              size="xs"
-              color="success"
-              variant="soft"
-              icon="i-lucide-check"
-              @click="openApproveWith(row)"
-            >
-              Approve
-            </UButton>
-            <UButton
-              v-if="row.status === 'ACTIVE'"
-              size="xs"
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-refresh-cw"
-              @click="openRenewWith(row)"
-            >
-              Renew
-            </UButton>
-            <UButton
-              v-if="row.status === 'ACTIVE'"
-              size="xs"
-              color="error"
-              variant="soft"
-              icon="i-lucide-ban"
-              @click="openTerminateWith(row)"
-            >
-              Terminate
-            </UButton>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-settings-2" @click="openManageWith(row)">
-              Manage
-            </UButton>
-          </div>
+          <RowActions :actions="leaseActions(row)" />
         </template>
         <template #empty-state>
           <EmptyState
@@ -163,94 +129,94 @@
       </template>
     </UModal>
 
-    <UModal v-model:open="showManage" :title="`Manage lease · ${manageTarget?.tenantName ?? ''} — Unit ${manageTarget?.unitNumber ?? ''}`" :ui="{ content: 'sm:max-w-2xl' }">
+    <UModal
+      v-model:open="showRentConfig"
+      :title="`Rent configuration · ${rentConfigTarget?.tenantName ?? ''} — Unit ${rentConfigTarget?.unitNumber ?? ''}`"
+    >
       <template #body>
-        <div class="space-y-6">
-          <div>
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Rent configuration
-            </h3>
-            <DynamicForm
-              v-model="rentConfigForm"
-              :fields="rentConfigFields"
-              :loading="rentConfigSaving"
-              :error="rentConfigError"
-              submit-label="Save"
-              @submit="onSaveRentConfig"
-            />
-          </div>
+        <DynamicForm
+          v-model="rentConfigForm"
+          :fields="rentConfigFields"
+          :loading="rentConfigSaving"
+          :error="rentConfigError"
+          submit-label="Save"
+          @submit="onSaveRentConfig"
+        />
+      </template>
+    </UModal>
 
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Deposit payments
-            </h3>
-            <div v-if="depositPaymentsLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="depositPayments.length === 0" class="text-sm text-gray-400 mb-3">
-              No deposit payments recorded yet.
-            </div>
-            <div v-else class="space-y-1.5 mb-4">
-              <div
-                v-for="p in depositPayments"
-                :key="p.id"
-                class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
-              >
-                <span class="text-gray-600 dark:text-gray-300">
-                  {{ formatDate(p.paymentDate) }} · {{ formatEnum(p.method) }}
-                  <span v-if="p.referenceNumber" class="text-gray-400">({{ p.referenceNumber }})</span>
-                </span>
-                <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(p.amount) }}</span>
-              </div>
-            </div>
-            <DynamicForm
-              v-model="depositForm"
-              :fields="depositFields"
-              :loading="depositSaving"
-              :error="depositError"
-              submit-label="Add payment"
-              @submit="onAddDeposit"
-            />
-          </div>
-
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Documents
-            </h3>
-            <div v-if="documentsLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="documents.length === 0" class="text-sm text-gray-400 mb-3">
-              No documents uploaded yet.
-            </div>
-            <div v-else class="space-y-1.5 mb-4">
-              <div
-                v-for="d in documents"
-                :key="d.id"
-                class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
-              >
-                <div>
-                  <button class="text-primary-500 hover:underline text-left" @click="onDownloadDocument(d)">{{ d.fileName }}</button>
-                  <span v-if="d.description" class="text-gray-400"> — {{ d.description }}</span>
-                  <div class="text-xs text-gray-400">{{ formatDateTime(d.createdAt) }} · {{ d.uploadedBy ?? '—' }}</div>
-                </div>
-                <UButton
-                  v-if="isAdmin"
-                  size="xs"
-                  color="error"
-                  variant="ghost"
-                  icon="i-lucide-trash-2"
-                  @click="onDeleteDocument(d)"
-                />
-              </div>
-            </div>
-
-            <FileUploadField v-if="isAdmin" :upload="uploadDocumentForTarget" @uploaded="onDocumentUploaded" />
+    <UModal
+      v-model:open="showDeposit"
+      :title="`Deposit payments · ${depositTarget?.tenantName ?? ''} — Unit ${depositTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="depositPaymentsLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="depositPayments.length === 0" class="text-sm text-gray-400 mb-3">
+          No deposit payments recorded yet.
+        </div>
+        <div v-else class="space-y-1.5 mb-4">
+          <div
+            v-for="p in depositPayments"
+            :key="p.id"
+            class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
+          >
+            <span class="text-gray-600 dark:text-gray-300">
+              {{ formatDate(p.paymentDate) }} · {{ formatEnum(p.method) }}
+              <span v-if="p.referenceNumber" class="text-gray-400">({{ p.referenceNumber }})</span>
+            </span>
+            <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(p.amount) }}</span>
           </div>
         </div>
+        <DynamicForm
+          v-model="depositForm"
+          :fields="depositFields"
+          :loading="depositSaving"
+          :error="depositError"
+          submit-label="Add payment"
+          @submit="onAddDeposit"
+        />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="showDocuments"
+      :title="`Documents · ${documentsTarget?.tenantName ?? ''} — Unit ${documentsTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="documentsLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="documents.length === 0" class="text-sm text-gray-400 mb-3">
+          No documents uploaded yet.
+        </div>
+        <div v-else class="space-y-1.5 mb-4">
+          <div
+            v-for="d in documents"
+            :key="d.id"
+            class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
+          >
+            <div>
+              <button class="text-primary-500 hover:underline text-left" @click="onDownloadDocument(d)">{{ d.fileName }}</button>
+              <span v-if="d.description" class="text-gray-400"> — {{ d.description }}</span>
+              <div class="text-xs text-gray-400">{{ formatDateTime(d.createdAt) }} · {{ d.uploadedBy ?? '—' }}</div>
+            </div>
+            <UButton
+              v-if="isAdmin"
+              size="xs"
+              color="error"
+              variant="ghost"
+              icon="i-lucide-trash-2"
+              @click="onDeleteDocument(d)"
+            />
+          </div>
+        </div>
+
+        <FileUploadField v-if="isAdmin" :upload="uploadDocumentForTarget" @uploaded="onDocumentUploaded" />
       </template>
     </UModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { ColumnDef, FieldDef } from '#shared/types'
+import type { ColumnDef, FieldDef, RowAction } from '#shared/types'
 import type {
   CreateDepositPaymentPayload,
   CreateLeasePayload,
@@ -491,11 +457,29 @@ async function onTerminateSubmit(values: Record<string, any>) {
   }
 }
 
-// Manage — rent configuration + deposit payments, both scoped to one lease.
+// Documents — its own modal/target, scoped to one lease.
 const {
-  open: showManage,
-  target: manageTarget,
-  openWith: openManageWith
+  open: showDocuments,
+  target: documentsTarget,
+  openWith: openDocumentsWith
+} = useTargetModal<Lease>()
+
+// Deposit payments — its own modal/target (each of Documents/Deposit/Rent
+// config is a distinct, self-contained concern rather than a sub-section of
+// a general-purpose "Manage" catch-all).
+const {
+  open: showDeposit,
+  target: depositTarget,
+  openWith: openDepositWith
+} = useTargetModal<Lease>()
+
+// Rent configuration — its own modal/target (billing cycle/due day/late fee
+// is set once up front and rarely touched again, unlike deposit payments and
+// documents which accumulate over the lease).
+const {
+  open: showRentConfig,
+  target: rentConfigTarget,
+  openWith: openRentConfigWith
 } = useTargetModal<Lease>()
 
 const rentConfigForm = ref<Record<string, any>>({})
@@ -547,10 +531,10 @@ const documents = ref<LeaseDocument[]>([])
 const documentsLoading = ref(false)
 
 async function loadDocuments() {
-  if (!manageTarget.value) return
+  if (!documentsTarget.value) return
   documentsLoading.value = true
   try {
-    documents.value = await listDocuments(manageTarget.value.id)
+    documents.value = await listDocuments(documentsTarget.value.id)
   } catch (err) {
     toast.add({ title: 'Could not load documents', description: apiErrorMessage(err), color: 'error' })
   } finally {
@@ -559,7 +543,7 @@ async function loadDocuments() {
 }
 
 function uploadDocumentForTarget(file: File, description?: string) {
-  return uploadDocument(manageTarget.value!.id, file, description)
+  return uploadDocument(documentsTarget.value!.id, file, description)
 }
 
 async function onDocumentUploaded() {
@@ -568,9 +552,9 @@ async function onDocumentUploaded() {
 }
 
 async function onDeleteDocument(doc: LeaseDocument) {
-  if (!manageTarget.value) return
+  if (!documentsTarget.value) return
   try {
-    await removeDocument(manageTarget.value.id, doc.id)
+    await removeDocument(documentsTarget.value.id, doc.id)
     toast.add({ title: 'Document deleted', color: 'success' })
     await loadDocuments()
   } catch (err) {
@@ -579,17 +563,38 @@ async function onDeleteDocument(doc: LeaseDocument) {
 }
 
 async function onDownloadDocument(doc: LeaseDocument) {
-  if (!manageTarget.value) return
+  if (!documentsTarget.value) return
   try {
-    await downloadDocument(manageTarget.value.id, doc.id, doc.fileName)
+    await downloadDocument(documentsTarget.value.id, doc.id, doc.fileName)
   } catch (err) {
     toast.add({ title: 'Could not download document', description: apiErrorMessage(err), color: 'error' })
   }
 }
 
-watch(showManage, async (value) => {
-  if (!value || !manageTarget.value) return
-  const leaseId = manageTarget.value.id
+watch(showDocuments, async (value) => {
+  if (!value || !documentsTarget.value) return
+  await loadDocuments()
+})
+
+watch(showDeposit, async (value) => {
+  if (!value || !depositTarget.value) return
+  const leaseId = depositTarget.value.id
+
+  depositForm.value = { paymentDate: new Date().toISOString().slice(0, 10) }
+  depositError.value = ''
+  depositPaymentsLoading.value = true
+  try {
+    depositPayments.value = await listDepositPayments(leaseId)
+  } catch (err) {
+    depositError.value = apiErrorMessage(err)
+  } finally {
+    depositPaymentsLoading.value = false
+  }
+})
+
+watch(showRentConfig, async (value) => {
+  if (!value || !rentConfigTarget.value) return
+  const leaseId = rentConfigTarget.value.id
 
   rentConfigError.value = ''
   rentConfigForm.value = { billingCycle: 'MONTHLY', dueDayOfMonth: 1, lateFeeType: 'NONE' }
@@ -610,23 +615,10 @@ watch(showManage, async (value) => {
       rentConfigError.value = apiErrorMessage(err)
     }
   }
-
-  depositForm.value = { paymentDate: new Date().toISOString().slice(0, 10) }
-  depositError.value = ''
-  depositPaymentsLoading.value = true
-  try {
-    depositPayments.value = await listDepositPayments(leaseId)
-  } catch (err) {
-    depositError.value = apiErrorMessage(err)
-  } finally {
-    depositPaymentsLoading.value = false
-  }
-
-  await loadDocuments()
 })
 
 async function onSaveRentConfig(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!rentConfigTarget.value) return
   rentConfigSaving.value = true
   rentConfigError.value = ''
   const payload: RentConfigurationPayload = {
@@ -638,9 +630,9 @@ async function onSaveRentConfig(values: Record<string, any>) {
   }
   try {
     if (rentConfigExists.value) {
-      await updateRentConfiguration(manageTarget.value.id, payload)
+      await updateRentConfiguration(rentConfigTarget.value.id, payload)
     } else {
-      await createRentConfiguration(manageTarget.value.id, payload)
+      await createRentConfiguration(rentConfigTarget.value.id, payload)
       rentConfigExists.value = true
     }
     toast.add({ title: 'Rent configuration saved', color: 'success' })
@@ -652,7 +644,7 @@ async function onSaveRentConfig(values: Record<string, any>) {
 }
 
 async function onAddDeposit(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!depositTarget.value) return
   depositSaving.value = true
   depositError.value = ''
   const payload: CreateDepositPaymentPayload = {
@@ -663,8 +655,8 @@ async function onAddDeposit(values: Record<string, any>) {
     notes: values.notes || undefined
   }
   try {
-    await createDepositPayment(manageTarget.value.id, payload)
-    depositPayments.value = await listDepositPayments(manageTarget.value.id)
+    await createDepositPayment(depositTarget.value.id, payload)
+    depositPayments.value = await listDepositPayments(depositTarget.value.id)
     depositForm.value = { paymentDate: new Date().toISOString().slice(0, 10) }
     toast.add({ title: 'Deposit payment recorded', color: 'success' })
     await load()
@@ -673,6 +665,21 @@ async function onAddDeposit(values: Record<string, any>) {
   } finally {
     depositSaving.value = false
   }
+}
+
+function leaseActions(row: Lease): RowAction[] {
+  const actions: RowAction[] = []
+  if (row.status === 'PENDING_APPROVAL') {
+    actions.push({ label: 'Approve', icon: 'i-lucide-check', color: 'success', onClick: () => openApproveWith(row) })
+  }
+  if (row.status === 'ACTIVE') {
+    actions.push({ label: 'Renew', icon: 'i-lucide-refresh-cw', onClick: () => openRenewWith(row) })
+    actions.push({ label: 'Terminate', icon: 'i-lucide-ban', color: 'error', onClick: () => openTerminateWith(row) })
+  }
+  actions.push({ label: 'Rent config', icon: 'i-lucide-banknote', onClick: () => openRentConfigWith(row) })
+  actions.push({ label: 'Deposit', icon: 'i-lucide-piggy-bank', onClick: () => openDepositWith(row) })
+  actions.push({ label: 'Documents', icon: 'i-lucide-folder', onClick: () => openDocumentsWith(row) })
+  return actions
 }
 
 onMounted(async () => {

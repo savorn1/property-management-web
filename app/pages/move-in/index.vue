@@ -7,8 +7,8 @@
 
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
-        <USelect v-model="filter.leaseId" :items="leaseFilterOptions" placeholder="Lease" class="w-56" />
-        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-44" />
+        <USelect v-model="filter.leaseId" :items="leaseFilterOptions" placeholder="Lease" class="w-48" />
+        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-36" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -46,41 +46,7 @@
         @refresh="load"
       >
         <template #actions-data="{ row }">
-          <div class="flex flex-wrap items-center gap-2">
-            <UButton
-              v-if="isAdmin && row.status === 'PENDING'"
-              size="xs"
-              color="success"
-              variant="soft"
-              icon="i-lucide-check"
-              @click="openApproveWith(row)"
-            >
-              Approve
-            </UButton>
-            <UButton
-              v-if="isAdmin && row.status === 'PENDING'"
-              size="xs"
-              color="error"
-              variant="soft"
-              icon="i-lucide-x"
-              @click="openRejectWith(row)"
-            >
-              Reject
-            </UButton>
-            <UButton
-              v-if="isAdmin && row.status === 'APPROVED'"
-              size="xs"
-              color="success"
-              variant="soft"
-              icon="i-lucide-flag"
-              @click="openCompleteWith(row)"
-            >
-              Complete
-            </UButton>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-settings-2" @click="openManageWith(row)">
-              Manage
-            </UButton>
-          </div>
+          <RowActions :actions="moveInActions(row)" />
         </template>
         <template #empty-state>
           <EmptyState
@@ -158,77 +124,75 @@
       </template>
     </UModal>
 
-    <UModal v-model:open="showManage" :title="`Manage move-in · ${manageTarget?.tenantName ?? ''} — Unit ${manageTarget?.unitNumber ?? ''}`" :ui="{ content: 'sm:max-w-2xl' }">
+    <UModal
+      v-model:open="showInspection"
+      :title="`Inspection · ${inspectionTarget?.tenantName ?? ''} — Unit ${inspectionTarget?.unitNumber ?? ''}`"
+    >
       <template #body>
-        <div class="space-y-6">
-          <div>
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Inspection
-            </h3>
-            <div v-if="inspectionLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="inspection" class="text-sm space-y-1 mb-3">
-              <div>{{ formatDate(inspection.inspectionDate) }} · Inspected by {{ inspection.inspectedBy }}</div>
-              <div>Condition: <StatusBadge :status="inspection.condition" /></div>
-              <div v-if="inspection.notes" class="text-gray-400">{{ inspection.notes }}</div>
-            </div>
-            <DynamicForm
-              v-else-if="isAdmin"
-              v-model="inspectionForm"
-              :fields="inspectionFields"
-              :loading="inspectionSaving"
-              :error="inspectionError"
-              submit-label="Record inspection"
-              @submit="onRecordInspection"
-            />
-            <div v-else class="text-sm text-gray-400">No inspection recorded yet.</div>
-          </div>
+        <div v-if="inspectionLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="inspection" class="text-sm space-y-1 mb-3">
+          <div>{{ formatDate(inspection.inspectionDate) }} · Inspected by {{ inspection.inspectedBy }}</div>
+          <div>Condition: <StatusBadge :status="inspection.condition" /></div>
+          <div v-if="inspection.notes" class="text-gray-400">{{ inspection.notes }}</div>
+        </div>
+        <DynamicForm
+          v-else-if="isAdmin"
+          v-model="inspectionForm"
+          :fields="inspectionFields"
+          :loading="inspectionSaving"
+          :error="inspectionError"
+          submit-label="Record inspection"
+          @submit="onRecordInspection"
+        />
+        <div v-else class="text-sm text-gray-400">No inspection recorded yet.</div>
+      </template>
+    </UModal>
 
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Key handovers
-            </h3>
-            <div v-if="keysLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="keyHandovers.length === 0" class="text-sm text-gray-400 mb-3">No keys handed over yet.</div>
-            <div v-else class="space-y-1.5 mb-4">
-              <div
-                v-for="k in keyHandovers"
-                :key="k.id"
-                class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
-              >
-                <span class="text-gray-600 dark:text-gray-300">
-                  {{ k.quantity }}× {{ k.keyType }} · {{ formatDate(k.handoverDate) }} · {{ k.handedOverBy }}
-                  <span v-if="k.returned" class="text-gray-400">(returned {{ k.returnedDate ? formatDate(k.returnedDate) : '' }})</span>
-                </span>
-                <UButton
-                  v-if="isAdmin && !k.returned"
-                  size="xs"
-                  color="neutral"
-                  variant="soft"
-                  :loading="returningKeyId === k.id"
-                  @click="onReturnKey(k)"
-                >
-                  Mark returned
-                </UButton>
-              </div>
-            </div>
-            <DynamicForm
-              v-if="isAdmin"
-              v-model="keyForm"
-              :fields="keyFields"
-              :loading="keySaving"
-              :error="keyError"
-              submit-label="Record handover"
-              @submit="onRecordKeyHandover"
-            />
+    <UModal
+      v-model:open="showKeys"
+      :title="`Key handovers · ${keysTarget?.tenantName ?? ''} — Unit ${keysTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="keysLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="keyHandovers.length === 0" class="text-sm text-gray-400 mb-3">No keys handed over yet.</div>
+        <div v-else class="space-y-1.5 mb-4">
+          <div
+            v-for="k in keyHandovers"
+            :key="k.id"
+            class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
+          >
+            <span class="text-gray-600 dark:text-gray-300">
+              {{ k.quantity }}× {{ k.keyType }} · {{ formatDate(k.handoverDate) }} · {{ k.handedOverBy }}
+              <span v-if="k.returned" class="text-gray-400">(returned {{ k.returnedDate ? formatDate(k.returnedDate) : '' }})</span>
+            </span>
+            <UButton
+              v-if="isAdmin && !k.returned"
+              size="xs"
+              color="neutral"
+              variant="soft"
+              :loading="returningKeyId === k.id"
+              @click="onReturnKey(k)"
+            >
+              Mark returned
+            </UButton>
           </div>
         </div>
+        <DynamicForm
+          v-if="isAdmin"
+          v-model="keyForm"
+          :fields="keyFields"
+          :loading="keySaving"
+          :error="keyError"
+          submit-label="Record handover"
+          @submit="onRecordKeyHandover"
+        />
       </template>
     </UModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { ColumnDef, FieldDef } from '#shared/types'
+import type { ColumnDef, FieldDef, RowAction } from '#shared/types'
 import type {
   CreateKeyHandoverPayload,
   CreateMoveInPayload,
@@ -429,8 +393,10 @@ async function onRejectSubmit(values: Record<string, any>) {
   }
 }
 
-// Manage — inspection + key handovers
-const { open: showManage, target: manageTarget, openWith: openManageWith } = useTargetModal<MoveInRequest>()
+// Inspection and Key handovers each get their own modal/target (rather than
+// one general-purpose "Manage" catch-all) — distinct concerns.
+const { open: showInspection, target: inspectionTarget, openWith: openInspectionWith } = useTargetModal<MoveInRequest>()
+const { open: showKeys, target: keysTarget, openWith: openKeysWith } = useTargetModal<MoveInRequest>()
 
 const inspection = ref<MoveInInspection | null>(null)
 const inspectionLoading = ref(false)
@@ -464,9 +430,9 @@ const keyFields: FieldDef[] = [
   { name: 'notes', type: 'textarea', wrapper: 'full' }
 ]
 
-watch(showManage, async (value) => {
-  if (!value || !manageTarget.value) return
-  const id = manageTarget.value.id
+watch(showInspection, async (value) => {
+  if (!value || !inspectionTarget.value) return
+  const id = inspectionTarget.value.id
 
   inspection.value = null
   inspectionForm.value = { inspectionDate: new Date().toISOString().slice(0, 10) }
@@ -480,6 +446,11 @@ watch(showManage, async (value) => {
   } finally {
     inspectionLoading.value = false
   }
+})
+
+watch(showKeys, async (value) => {
+  if (!value || !keysTarget.value) return
+  const id = keysTarget.value.id
 
   keyForm.value = { handoverDate: new Date().toISOString().slice(0, 10), quantity: 1 }
   keyError.value = ''
@@ -494,7 +465,7 @@ watch(showManage, async (value) => {
 })
 
 async function onRecordInspection(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!inspectionTarget.value) return
   inspectionSaving.value = true
   inspectionError.value = ''
   const payload: CreateInspectionPayload = {
@@ -504,7 +475,7 @@ async function onRecordInspection(values: Record<string, any>) {
     notes: values.notes || undefined
   }
   try {
-    inspection.value = await recordInspection(manageTarget.value.id, payload)
+    inspection.value = await recordInspection(inspectionTarget.value.id, payload)
     toast.add({ title: 'Inspection recorded', color: 'success' })
     await load()
   } catch (err) {
@@ -515,7 +486,7 @@ async function onRecordInspection(values: Record<string, any>) {
 }
 
 async function onRecordKeyHandover(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!keysTarget.value) return
   keySaving.value = true
   keyError.value = ''
   const payload: CreateKeyHandoverPayload = {
@@ -526,10 +497,10 @@ async function onRecordKeyHandover(values: Record<string, any>) {
     notes: values.notes || undefined
   }
   try {
-    await recordKeyHandover(manageTarget.value.id, payload)
+    await recordKeyHandover(keysTarget.value.id, payload)
     keyForm.value = { handoverDate: new Date().toISOString().slice(0, 10), quantity: 1 }
     toast.add({ title: 'Key handover recorded', color: 'success' })
-    keyHandovers.value = await getKeyHandovers(manageTarget.value.id)
+    keyHandovers.value = await getKeyHandovers(keysTarget.value.id)
     await load()
   } catch (err) {
     keyError.value = apiErrorMessage(err)
@@ -539,12 +510,12 @@ async function onRecordKeyHandover(values: Record<string, any>) {
 }
 
 async function onReturnKey(k: KeyHandover) {
-  if (!manageTarget.value) return
+  if (!keysTarget.value) return
   returningKeyId.value = k.id
   try {
-    await returnKey(manageTarget.value.id, k.id)
+    await returnKey(keysTarget.value.id, k.id)
     toast.add({ title: 'Key marked as returned', color: 'success' })
-    keyHandovers.value = await getKeyHandovers(manageTarget.value.id)
+    keyHandovers.value = await getKeyHandovers(keysTarget.value.id)
   } catch (err) {
     toast.add({ title: 'Could not update key handover', description: apiErrorMessage(err), color: 'error' })
   } finally {
@@ -565,5 +536,19 @@ function clearFilters() {
   filter.leaseId = undefined
   filter.status = undefined
   load()
+}
+
+function moveInActions(row: MoveInRequest): RowAction[] {
+  const actions: RowAction[] = []
+  if (isAdmin.value && row.status === 'PENDING') {
+    actions.push({ label: 'Approve', icon: 'i-lucide-check', color: 'success', onClick: () => openApproveWith(row) })
+    actions.push({ label: 'Reject', icon: 'i-lucide-x', color: 'error', onClick: () => openRejectWith(row) })
+  }
+  if (isAdmin.value && row.status === 'APPROVED') {
+    actions.push({ label: 'Complete', icon: 'i-lucide-flag', color: 'success', onClick: () => openCompleteWith(row) })
+  }
+  actions.push({ label: 'Inspection', icon: 'i-lucide-clipboard-check', onClick: () => openInspectionWith(row) })
+  actions.push({ label: 'Key handovers', icon: 'i-lucide-key', onClick: () => openKeysWith(row) })
+  return actions
 }
 </script>

@@ -8,7 +8,7 @@
       <div class="flex flex-wrap items-end gap-3">
         <div>
           <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Account</label>
-          <USelect v-model="filter.accountId" :items="accountOptions" placeholder="Account" class="w-64" />
+          <USelect v-model="filter.accountId" :items="accountOptions" placeholder="Account" class="w-56" />
         </div>
         <div>
           <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">From date</label>

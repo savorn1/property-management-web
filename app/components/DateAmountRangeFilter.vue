@@ -1,19 +1,19 @@
 <template>
   <div>
     <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">From date</label>
-    <UInput v-model="startDate" type="date" class="w-40" />
+    <UInput v-model="startDate" type="date" class="w-32" />
   </div>
   <div>
     <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">To date</label>
-    <UInput v-model="endDate" type="date" class="w-40" />
+    <UInput v-model="endDate" type="date" class="w-32" />
   </div>
   <div>
     <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Min amount</label>
-    <UInput v-model="minAmount" type="number" step="0.01" placeholder="0.00" class="w-32" />
+    <UInput v-model="minAmount" type="number" step="0.01" placeholder="0.00" class="w-24" />
   </div>
   <div>
     <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Max amount</label>
-    <UInput v-model="maxAmount" type="number" step="0.01" placeholder="0.00" class="w-32" />
+    <UInput v-model="maxAmount" type="number" step="0.01" placeholder="0.00" class="w-24" />
   </div>
   <UButton
     v-if="hasAnyFilter && !hideClear"

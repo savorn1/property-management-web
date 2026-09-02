@@ -7,8 +7,8 @@
 
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
-        <USelect v-model="filter.leaseId" :items="leaseFilterOptions" placeholder="Lease" class="w-64" />
-        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-48" />
+        <USelect v-model="filter.leaseId" :items="leaseFilterOptions" placeholder="Lease" class="w-56" />
+        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-40" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -70,53 +70,7 @@
           </UButton>
         </template>
         <template #actions-data="{ row }">
-          <div class="flex flex-wrap items-center gap-2">
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-eye" @click="openDetailsWith(row)">
-              Details
-            </UButton>
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-file-down"
-              :loading="downloadingPdfId === row.id"
-              @click="onDownloadPdf(row)"
-            >
-              PDF
-            </UButton>
-            <template v-if="isAdmin">
-              <UButton
-                v-if="row.status !== 'CANCELLED' && row.status !== 'PAID'"
-                size="xs"
-                color="primary"
-                variant="soft"
-                icon="i-lucide-hand-coins"
-                @click="openRecordPaymentWith(row)"
-              >
-                Record payment
-              </UButton>
-              <UButton
-                v-if="(row.status === 'PENDING' || row.status === 'PARTIALLY_PAID') && row.overdue"
-                size="xs"
-                color="warning"
-                variant="soft"
-                icon="i-lucide-alarm-clock"
-                @click="openLateFeeWith(row)"
-              >
-                Apply late fee
-              </UButton>
-              <UButton
-                v-if="row.status !== 'CANCELLED' && row.status !== 'PAID'"
-                size="xs"
-                color="error"
-                variant="soft"
-                icon="i-lucide-ban"
-                @click="openCancelWith(row)"
-              >
-                Cancel
-              </UButton>
-            </template>
-          </div>
+          <RowActions :actions="invoiceActions(row)" />
         </template>
         <template #empty-state>
           <EmptyState
@@ -360,7 +314,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ColumnDef, FieldDef } from '#shared/types'
+import type { ColumnDef, FieldDef, RowAction } from '#shared/types'
 import type { CreateInvoicePayload, CreatePaymentPayload, Invoice, InvoiceStatus } from '~/composables/useInvoices'
 import type { Payment } from '#shared/domain'
 import type { CreateCreditNotePayload, CreditNote } from '~/composables/useCreditNotes'
@@ -861,5 +815,24 @@ function clearFilters() {
   filter.status = undefined
   selected.value = []
   load()
+}
+
+function invoiceActions(row: Invoice): RowAction[] {
+  const actions: RowAction[] = [
+    { label: 'Details', icon: 'i-lucide-eye', onClick: () => openDetailsWith(row) },
+    { label: 'PDF', icon: 'i-lucide-file-down', loading: downloadingPdfId.value === row.id, onClick: () => onDownloadPdf(row) }
+  ]
+  if (isAdmin.value) {
+    if (row.status !== 'CANCELLED' && row.status !== 'PAID') {
+      actions.push({ label: 'Record payment', icon: 'i-lucide-hand-coins', color: 'primary', onClick: () => openRecordPaymentWith(row) })
+    }
+    if ((row.status === 'PENDING' || row.status === 'PARTIALLY_PAID') && row.overdue) {
+      actions.push({ label: 'Apply late fee', icon: 'i-lucide-alarm-clock', color: 'warning', onClick: () => openLateFeeWith(row) })
+    }
+    if (row.status !== 'CANCELLED' && row.status !== 'PAID') {
+      actions.push({ label: 'Cancel', icon: 'i-lucide-ban', color: 'error', onClick: () => openCancelWith(row) })
+    }
+  }
+  return actions
 }
 </script>

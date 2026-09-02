@@ -6,16 +6,14 @@
 
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
-        <USelect v-model="filter.sourceType" :items="sourceTypeFilterOptions" placeholder="Source type" class="w-52" />
+        <USelect v-model="filter.sourceType" :items="sourceTypeFilterOptions" placeholder="Source type" class="w-44" />
         <UInput
-          v-model.number="filter.sourceId"
+          v-model="search"
           type="number"
           placeholder="Source ID"
           icon="i-lucide-hash"
           class="w-40"
-          @keyup.enter="load"
         />
-        <UButton size="sm" color="neutral" variant="soft" icon="i-lucide-search" @click="load">Search</UButton>
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -98,9 +96,8 @@ const rows = ref<Receipt[]>([])
 const loading = ref(false)
 const error = ref('')
 
-const filter = reactive<{ sourceType: ReceiptSourceType | undefined; sourceId: number | undefined }>({
-  sourceType: undefined,
-  sourceId: undefined
+const filter = reactive<{ sourceType: ReceiptSourceType | undefined }>({
+  sourceType: undefined
 })
 
 const SOURCE_TYPE_OPTIONS: { label: string; value: ReceiptSourceType }[] = [
@@ -116,7 +113,10 @@ const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   direction: 'desc'
 })
 
-const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
+const { page, pageSize, total, rows: pagedRows, truncated, search } = useClientTable(rows, {
+  pageSize: 10,
+  searchFields: ['sourceId']
+})
 
 const columns: ColumnDef<Receipt>[] = [
   { key: 'receiptNumber', label: 'Receipt #' },
@@ -149,7 +149,6 @@ async function load() {
   try {
     const res = await list({
       sourceType: filter.sourceType,
-      sourceId: filter.sourceId || undefined,
       sortBy: sort.value?.column,
       sortOrder: sort.value?.direction,
       size: 200
@@ -166,11 +165,11 @@ onMounted(load)
 watch(sort, load)
 watch(() => filter.sourceType, load)
 
-const hasActiveFilter = computed(() => filter.sourceType !== undefined || filter.sourceId !== undefined)
+const hasActiveFilter = computed(() => filter.sourceType !== undefined || search.value !== '')
 
 function clearFilters() {
   filter.sourceType = undefined
-  filter.sourceId = undefined
+  search.value = ''
   load()
 }
 </script>

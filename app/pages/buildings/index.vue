@@ -11,16 +11,15 @@
           v-model="filter.propertyId"
           :items="propertyFilterOptions"
           placeholder="Property"
-          class="w-56"
+          class="w-48"
         />
         <UInput
-          v-model="filter.name"
+          v-model="search"
           placeholder="Search name"
           icon="i-lucide-search"
           class="w-56"
-          @keyup.enter="load"
         />
-        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-44" />
+        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-36" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -59,29 +58,7 @@
         @select="(row) => navigateTo(`/floors?buildingId=${row.id}`)"
       >
         <template #actions-data="{ row }">
-          <div class="flex items-center gap-2">
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-layers"
-              @click.stop="navigateTo(`/floors?buildingId=${row.id}`)"
-            >
-              Floors
-            </UButton>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-sparkles" @click.stop="openFacilitiesWith(row)">
-              Facilities
-            </UButton>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-file-text" @click.stop="openDocumentsWith(row)">
-              Documents
-            </UButton>
-            <UButton size="xs" color="primary" variant="soft" icon="i-lucide-pencil" @click.stop="openEdit(row)">
-              Edit
-            </UButton>
-            <UButton size="xs" color="error" variant="soft" icon="i-lucide-trash-2" @click.stop="confirmDelete = row">
-              Delete
-            </UButton>
-          </div>
+          <RowActions :actions="buildingActions(row)" />
         </template>
         <template #empty-state>
           <EmptyState
@@ -219,7 +196,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ColumnDef, FieldDef } from '#shared/types'
+import type { ColumnDef, FieldDef, RowAction } from '#shared/types'
 import type { Building, BuildingStatus, CreateBuildingPayload, UpdateBuildingPayload } from '~/composables/useBuildings'
 import type { BuildingFacility } from '~/composables/useBuildingFacilities'
 import type { BuildingDocument } from '~/composables/useBuildingDocuments'
@@ -244,9 +221,8 @@ const error = ref('')
 
 const initialPropertyId = Number(route.query.propertyId) || undefined
 const initialStatus = (route.query.status as BuildingStatus | undefined) || undefined
-const filter = reactive<{ propertyId: number | undefined; name: string; status: BuildingStatus | undefined }>({
+const filter = reactive<{ propertyId: number | undefined; status: BuildingStatus | undefined }>({
   propertyId: initialPropertyId,
-  name: '',
   status: initialStatus
 })
 
@@ -271,7 +247,10 @@ const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   direction: 'desc'
 })
 
-const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
+const { page, pageSize, total, rows: pagedRows, truncated, search } = useClientTable(rows, {
+  pageSize: 10,
+  searchFields: ['name']
+})
 
 const columns: ColumnDef<Building>[] = [
   { key: 'name', sortable: true },
@@ -288,7 +267,6 @@ async function load() {
   try {
     const res = await list({
       propertyId: filter.propertyId,
-      name: filter.name || undefined,
       status: filter.status,
       sortBy: sort.value?.column,
       sortOrder: sort.value?.direction,
@@ -497,12 +475,22 @@ onMounted(async () => {
 watch(sort, load)
 watch(() => [filter.propertyId, filter.status], load)
 
-const hasActiveFilter = computed(() => filter.propertyId !== undefined || filter.name !== '' || filter.status !== undefined)
+const hasActiveFilter = computed(() => filter.propertyId !== undefined || search.value !== '' || filter.status !== undefined)
 
 function clearFilters() {
   filter.propertyId = undefined
-  filter.name = ''
+  search.value = ''
   filter.status = undefined
   load()
+}
+
+function buildingActions(row: Building): RowAction[] {
+  return [
+    { label: 'Floors', icon: 'i-lucide-layers', onClick: () => navigateTo(`/floors?buildingId=${row.id}`) },
+    { label: 'Edit', icon: 'i-lucide-pencil', color: 'primary', onClick: () => openEdit(row) },
+    { label: 'Delete', icon: 'i-lucide-trash-2', color: 'error', onClick: () => (confirmDelete.value = row) },
+    { label: 'Facilities', icon: 'i-lucide-sparkles', onClick: () => openFacilitiesWith(row) },
+    { label: 'Documents', icon: 'i-lucide-file-text', onClick: () => openDocumentsWith(row) }
+  ]
 }
 </script>

@@ -7,10 +7,9 @@
 
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
-        <USelect v-model="filter.purpose" :items="purposeFilterOptions" placeholder="Purpose" class="w-44" />
-        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-48" />
-        <UInput v-model="filter.fullName" placeholder="Search name" icon="i-lucide-search" class="w-56" @keyup.enter="load" />
-        <UButton size="sm" color="neutral" variant="soft" icon="i-lucide-search" @click="load">Search</UButton>
+        <USelect v-model="filter.purpose" :items="purposeFilterOptions" placeholder="Purpose" class="w-36" />
+        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-40" />
+        <UInput v-model="search" placeholder="Search name" icon="i-lucide-search" class="w-56" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -41,57 +40,7 @@
         @refresh="load"
       >
         <template #actions-data="{ row }">
-          <div class="flex flex-wrap items-center gap-2">
-            <UButton
-              v-if="isAdmin && row.purpose === 'RENTAL' && canConvert(row)"
-              size="xs"
-              color="success"
-              variant="soft"
-              icon="i-lucide-user-check"
-              @click="openConvertWith(row)"
-            >
-              Convert to tenant
-            </UButton>
-            <UButton
-              v-if="isAdmin && row.purpose === 'SALE' && canConvert(row)"
-              size="xs"
-              color="success"
-              variant="soft"
-              icon="i-lucide-handshake"
-              @click="openConvertReservationWith(row)"
-            >
-              Convert to reservation
-            </UButton>
-            <UButton
-              v-if="isAdmin && row.status !== 'CONVERTED'"
-              size="xs"
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-flag"
-              @click="openStatusWith(row)"
-            >
-              Status
-            </UButton>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-history" @click="openHistoryWith(row)">
-              History
-            </UButton>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-paperclip" @click="openDocumentsWith(row)">
-              Documents
-            </UButton>
-            <UButton v-if="isAdmin" size="xs" color="primary" variant="soft" icon="i-lucide-pencil" @click="openEdit(row)">
-              Edit
-            </UButton>
-            <UButton
-              v-if="isAdmin && row.status !== 'CONVERTED'"
-              size="xs"
-              color="error"
-              variant="soft"
-              icon="i-lucide-trash-2"
-              @click="confirmDelete = row"
-            >
-              Delete
-            </UButton>
-          </div>
+          <RowActions :actions="leadActions(row)" />
         </template>
         <template #empty-state>
           <EmptyState
@@ -264,7 +213,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ColumnDef, FieldDef } from '#shared/types'
+import type { ColumnDef, FieldDef, RowAction } from '#shared/types'
 import type { Lead, LeadPurpose, LeadStatus, LeadHistoryEntry } from '~/composables/useLeads'
 import type { LeadDocument } from '~/composables/useLeadDocuments'
 
@@ -278,10 +227,9 @@ const rows = ref<Lead[]>([])
 const loading = ref(false)
 const error = ref('')
 
-const filter = reactive<{ purpose: LeadPurpose | undefined; status: LeadStatus | undefined; fullName: string }>({
+const filter = reactive<{ purpose: LeadPurpose | undefined; status: LeadStatus | undefined }>({
   purpose: undefined,
-  status: undefined,
-  fullName: ''
+  status: undefined
 })
 
 const unitOptions = ref<{ label: string; value: number }[]>([])
@@ -309,7 +257,10 @@ const STATUS_OPTIONS: { label: string; value: LeadStatus }[] = [
 const statusFilterOptions = [{ label: 'All statuses', value: undefined }, ...STATUS_OPTIONS]
 
 const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({ column: 'id', direction: 'desc' })
-const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
+const { page, pageSize, total, rows: pagedRows, truncated, search } = useClientTable(rows, {
+  pageSize: 10,
+  searchFields: ['fullName']
+})
 
 const columns: ColumnDef<Lead>[] = [
   { key: 'fullName', label: 'Name' },
@@ -327,7 +278,6 @@ async function load() {
     const res = await list({
       purpose: filter.purpose,
       status: filter.status,
-      fullName: filter.fullName || undefined,
       sortBy: sort.value?.column,
       sortOrder: sort.value?.direction,
       size: 200
@@ -610,12 +560,34 @@ watch(sort, load)
 watch(() => [filter.purpose, filter.status], load)
 
 const hasActiveFilter = computed(
-  () => filter.purpose !== undefined || filter.status !== undefined || filter.fullName !== ''
+  () => filter.purpose !== undefined || filter.status !== undefined || search.value !== ''
 )
 function clearFilters() {
   filter.purpose = undefined
   filter.status = undefined
-  filter.fullName = ''
+  search.value = ''
   load()
+}
+
+function leadActions(row: Lead): RowAction[] {
+  const actions: RowAction[] = []
+  if (isAdmin.value && row.purpose === 'RENTAL' && canConvert(row)) {
+    actions.push({ label: 'Convert to tenant', icon: 'i-lucide-user-check', color: 'success', onClick: () => openConvertWith(row) })
+  }
+  if (isAdmin.value && row.purpose === 'SALE' && canConvert(row)) {
+    actions.push({ label: 'Convert to reservation', icon: 'i-lucide-handshake', color: 'success', onClick: () => openConvertReservationWith(row) })
+  }
+  if (isAdmin.value) {
+    actions.push({ label: 'Edit', icon: 'i-lucide-pencil', color: 'primary', onClick: () => openEdit(row) })
+  }
+  if (isAdmin.value && row.status !== 'CONVERTED') {
+    actions.push({ label: 'Delete', icon: 'i-lucide-trash-2', color: 'error', onClick: () => (confirmDelete.value = row) })
+  }
+  if (isAdmin.value && row.status !== 'CONVERTED') {
+    actions.push({ label: 'Status', icon: 'i-lucide-flag', onClick: () => openStatusWith(row) })
+  }
+  actions.push({ label: 'History', icon: 'i-lucide-history', onClick: () => openHistoryWith(row) })
+  actions.push({ label: 'Documents', icon: 'i-lucide-paperclip', onClick: () => openDocumentsWith(row) })
+  return actions
 }
 </script>

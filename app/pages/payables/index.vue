@@ -6,10 +6,17 @@
     </div>
 
     <UCard class="mb-4">
-      <div class="flex flex-wrap gap-3">
-        <USelect v-model="filter.vendorId" :items="vendorFilterOptions" placeholder="Vendor" class="w-56" />
-        <USelect v-model="filter.propertyId" :items="propertyFilterOptions" placeholder="Property" class="w-56" />
-        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-44" />
+      <div class="flex flex-wrap items-end gap-3">
+        <USelect v-model="filter.vendorId" :items="vendorFilterOptions" placeholder="Vendor" class="w-40" />
+        <USelect v-model="filter.propertyId" :items="propertyFilterOptions" placeholder="Property" class="w-40" />
+        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-32" />
+        <DateAmountRangeFilter
+          v-model:start-date="filter.dueDateFrom"
+          v-model:end-date="filter.dueDateTo"
+          v-model:min-amount="filter.minAmount"
+          v-model:max-amount="filter.maxAmount"
+          hide-clear
+        />
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -47,14 +54,7 @@
         @refresh="load"
       >
         <template #actions-data="{ row }">
-          <div class="flex flex-wrap items-center gap-2">
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-banknote" @click.stop="openManageWith(row)">
-              Payments
-            </UButton>
-            <UButton size="xs" color="error" variant="soft" icon="i-lucide-trash-2" @click.stop="confirmDelete = row">
-              Delete
-            </UButton>
-          </div>
+          <RowActions :actions="payableActions(row)" />
         </template>
         <template #empty-state>
           <EmptyState
@@ -96,14 +96,14 @@
     </UModal>
 
     <UModal
-      v-model:open="showManage"
-      :title="`Payments · ${manageTarget?.vendorName ?? ''}${manageTarget?.billNumber ? ` — ${manageTarget.billNumber}` : ''}`"
+      v-model:open="showPayments"
+      :title="`Payments · ${paymentsTarget?.vendorName ?? ''}${paymentsTarget?.billNumber ? ` — ${paymentsTarget.billNumber}` : ''}`"
     >
       <template #body>
         <div class="space-y-4">
           <div class="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-            <span>Bill amount: <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(manageTarget?.amount) }}</span></span>
-            <span>Balance due: <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(manageTarget?.balanceDue) }}</span></span>
+            <span>Bill amount: <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(paymentsTarget?.amount) }}</span></span>
+            <span>Balance due: <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(paymentsTarget?.balanceDue) }}</span></span>
           </div>
 
           <div v-if="paymentsLoading" class="text-sm text-gray-400">Loading…</div>
@@ -150,7 +150,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ColumnDef, FieldDef } from '#shared/types'
+import type { ColumnDef, FieldDef, RowAction } from '#shared/types'
 import type { CreatePayablePayload, Payable, PayableStatus } from '~/composables/usePayables'
 import type { PayablePayment } from '~/composables/usePayablePayments'
 
@@ -166,10 +166,22 @@ const rows = ref<Payable[]>([])
 const loading = ref(false)
 const error = ref('')
 
-const filter = reactive<{ vendorId: number | undefined; propertyId: number | undefined; status: PayableStatus | undefined }>({
+const filter = reactive<{
+  vendorId: number | undefined
+  propertyId: number | undefined
+  status: PayableStatus | undefined
+  dueDateFrom: string | undefined
+  dueDateTo: string | undefined
+  minAmount: number | undefined
+  maxAmount: number | undefined
+}>({
   vendorId: undefined,
   propertyId: undefined,
-  status: undefined
+  status: undefined,
+  dueDateFrom: undefined,
+  dueDateTo: undefined,
+  minAmount: undefined,
+  maxAmount: undefined
 })
 
 const vendorOptions = ref<{ label: string; value: number }[]>([])
@@ -195,7 +207,25 @@ const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   direction: 'asc'
 })
 
-const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
+// Due-date/amount range aren't backend filter params (see PayableFilter) —
+// vendor/property/status narrow the server fetch, then this narrows further
+// within whatever came back, same as useClientTable's own search does.
+const rangeFilteredRows = computed(() =>
+  rows.value.filter((row) => {
+    if (filter.dueDateFrom && row.dueDate < filter.dueDateFrom) return false
+    if (filter.dueDateTo && row.dueDate > filter.dueDateTo) return false
+    if (filter.minAmount !== undefined && row.amount < filter.minAmount) return false
+    if (filter.maxAmount !== undefined && row.amount > filter.maxAmount) return false
+    return true
+  })
+)
+
+const { page, pageSize, total, rows: pagedRows } = useClientTable(rangeFilteredRows, { pageSize: 10 })
+// useClientTable's own `truncated` would measure the range-filtered subset,
+// not the raw fetch — always well under the 200 cap once any range filter is
+// active. What actually matters here is whether the *fetch itself* got
+// capped, so this checks `rows` (pre-range-filter) directly instead.
+const truncated = computed(() => rows.value.length >= 200)
 
 const columns: ColumnDef<Payable>[] = [
   { key: 'vendorName', label: 'Vendor' },
@@ -269,11 +299,11 @@ const {
   }
 )
 
-// Manage — payment history + inline create, scoped to one payable.
+// Payments — history + inline create, scoped to one payable.
 const {
-  open: showManage,
-  target: manageTarget,
-  openWith: openManageWith
+  open: showPayments,
+  target: paymentsTarget,
+  openWith: openPaymentsWith
 } = useTargetModal<Payable>()
 
 const payments = ref<PayablePayment[]>([])
@@ -298,13 +328,13 @@ const paymentFields: FieldDef[] = [
   { name: 'notes', type: 'textarea', wrapper: 'full' }
 ]
 
-watch(showManage, async (value) => {
-  if (!value || !manageTarget.value) return
+watch(showPayments, async (value) => {
+  if (!value || !paymentsTarget.value) return
   paymentForm.value = { paymentDate: new Date().toISOString().slice(0, 10) }
   paymentError.value = ''
   paymentsLoading.value = true
   try {
-    payments.value = await listPayments(manageTarget.value.id)
+    payments.value = await listPayments(paymentsTarget.value.id)
   } catch (err) {
     paymentError.value = apiErrorMessage(err)
   } finally {
@@ -313,23 +343,23 @@ watch(showManage, async (value) => {
 })
 
 async function onAddPayment(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!paymentsTarget.value) return
   paymentSaving.value = true
   paymentError.value = ''
   try {
-    await createPayment(manageTarget.value.id, {
+    await createPayment(paymentsTarget.value.id, {
       amount: values.amount,
       paymentDate: values.paymentDate,
       method: values.method,
       referenceNumber: values.referenceNumber || undefined,
       notes: values.notes || undefined
     })
-    payments.value = await listPayments(manageTarget.value.id)
+    payments.value = await listPayments(paymentsTarget.value.id)
     paymentForm.value = { paymentDate: new Date().toISOString().slice(0, 10) }
     toast.add({ title: 'Payable payment recorded', color: 'success' })
     await load()
-    const refreshed = rows.value.find((row) => row.id === manageTarget.value?.id)
-    if (refreshed) manageTarget.value = refreshed
+    const refreshed = rows.value.find((row) => row.id === paymentsTarget.value?.id)
+    if (refreshed) paymentsTarget.value = refreshed
   } catch (err) {
     paymentError.value = apiErrorMessage(err)
   } finally {
@@ -345,13 +375,31 @@ watch(sort, load)
 watch(() => [filter.vendorId, filter.propertyId, filter.status], load)
 
 const hasActiveFilter = computed(
-  () => filter.vendorId !== undefined || filter.propertyId !== undefined || filter.status !== undefined
+  () =>
+    filter.vendorId !== undefined ||
+    filter.propertyId !== undefined ||
+    filter.status !== undefined ||
+    !!filter.dueDateFrom ||
+    !!filter.dueDateTo ||
+    filter.minAmount !== undefined ||
+    filter.maxAmount !== undefined
 )
 
 function clearFilters() {
   filter.vendorId = undefined
   filter.propertyId = undefined
   filter.status = undefined
+  filter.dueDateFrom = undefined
+  filter.dueDateTo = undefined
+  filter.minAmount = undefined
+  filter.maxAmount = undefined
   load()
+}
+
+function payableActions(row: Payable): RowAction[] {
+  return [
+    { label: 'Payments', icon: 'i-lucide-banknote', onClick: () => openPaymentsWith(row) },
+    { label: 'Delete', icon: 'i-lucide-trash-2', color: 'error', onClick: () => (confirmDelete.value = row) }
+  ]
 }
 </script>

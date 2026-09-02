@@ -7,9 +7,9 @@
 
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
-        <USelect v-model="filter.unitId" :items="unitFilterOptions" placeholder="Unit" class="w-56" />
-        <USelect v-model="filter.meterType" :items="typeFilterOptions" placeholder="Meter type" class="w-44" />
-        <USelect v-model="filter.active" :items="activeFilterOptions" placeholder="Status" class="w-40" />
+        <USelect v-model="filter.unitId" :items="unitFilterOptions" placeholder="Unit" class="w-48" />
+        <USelect v-model="filter.meterType" :items="typeFilterOptions" placeholder="Meter type" class="w-36" />
+        <USelect v-model="filter.active" :items="activeFilterOptions" placeholder="Status" class="w-32" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"

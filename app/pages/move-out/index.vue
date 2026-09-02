@@ -7,8 +7,8 @@
 
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
-        <USelect v-model="filter.leaseId" :items="leaseFilterOptions" placeholder="Lease" class="w-56" />
-        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-44" />
+        <USelect v-model="filter.leaseId" :items="leaseFilterOptions" placeholder="Lease" class="w-48" />
+        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-36" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -46,31 +46,7 @@
         @refresh="load"
       >
         <template #actions-data="{ row }">
-          <div class="flex flex-wrap items-center gap-2">
-            <UButton
-              v-if="isAdmin && row.status === 'PENDING'"
-              size="xs"
-              color="success"
-              variant="soft"
-              icon="i-lucide-check"
-              @click="openApproveWith(row)"
-            >
-              Approve
-            </UButton>
-            <UButton
-              v-if="isAdmin && row.status === 'PENDING'"
-              size="xs"
-              color="error"
-              variant="soft"
-              icon="i-lucide-x"
-              @click="openRejectWith(row)"
-            >
-              Reject
-            </UButton>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-settings-2" @click="openManageWith(row)">
-              Manage
-            </UButton>
-          </div>
+          <RowActions :actions="moveOutActions(row)" />
         </template>
         <template #empty-state>
           <EmptyState
@@ -137,123 +113,125 @@
       </template>
     </UModal>
 
-    <UModal v-model:open="showManage" :title="`Manage move-out · ${manageTarget?.tenantName ?? ''} — Unit ${manageTarget?.unitNumber ?? ''}`" :ui="{ content: 'sm:max-w-2xl' }">
+    <UModal
+      v-model:open="showInspection"
+      :title="`Inspection · ${inspectionTarget?.tenantName ?? ''} — Unit ${inspectionTarget?.unitNumber ?? ''}`"
+    >
       <template #body>
-        <div class="max-h-[70vh] overflow-y-auto space-y-6 pr-1">
-          <div>
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Inspection
-            </h3>
-            <div v-if="inspectionLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="inspection" class="text-sm space-y-1 mb-3">
-              <div>{{ formatDate(inspection.inspectionDate) }} · Inspected by {{ inspection.inspectedBy }}</div>
-              <div>Condition: <StatusBadge :status="inspection.condition" /></div>
-              <div v-if="inspection.notes" class="text-gray-400">{{ inspection.notes }}</div>
-            </div>
-            <DynamicForm
-              v-else-if="isAdmin"
-              v-model="inspectionForm"
-              :fields="inspectionFields"
-              :loading="inspectionSaving"
-              :error="inspectionError"
-              submit-label="Record inspection"
-              @submit="onRecordInspection"
-            />
-            <div v-else class="text-sm text-gray-400">No inspection recorded yet.</div>
-          </div>
+        <div v-if="inspectionLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="inspection" class="text-sm space-y-1 mb-3">
+          <div>{{ formatDate(inspection.inspectionDate) }} · Inspected by {{ inspection.inspectedBy }}</div>
+          <div>Condition: <StatusBadge :status="inspection.condition" /></div>
+          <div v-if="inspection.notes" class="text-gray-400">{{ inspection.notes }}</div>
+        </div>
+        <DynamicForm
+          v-else-if="isAdmin"
+          v-model="inspectionForm"
+          :fields="inspectionFields"
+          :loading="inspectionSaving"
+          :error="inspectionError"
+          submit-label="Record inspection"
+          @submit="onRecordInspection"
+        />
+        <div v-else class="text-sm text-gray-400">No inspection recorded yet.</div>
+      </template>
+    </UModal>
 
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Damage charges
-            </h3>
-            <div v-if="damageChargesLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="damageCharges.length === 0" class="text-sm text-gray-400 mb-3">No damage charges recorded.</div>
-            <div v-else class="space-y-1.5 mb-4">
-              <div
-                v-for="d in damageCharges"
-                :key="d.id"
-                class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
-              >
-                <span class="text-gray-600 dark:text-gray-300">{{ d.description }}</span>
-                <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(d.amount) }}</span>
-              </div>
-            </div>
-            <DynamicForm
-              v-if="isAdmin"
-              v-model="damageChargeForm"
-              :fields="damageChargeFields"
-              :loading="damageChargeSaving"
-              :error="damageChargeError"
-              submit-label="Add charge"
-              @submit="onAddDamageCharge"
-            />
-          </div>
-
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Deposit settlement
-            </h3>
-            <div v-if="settlementLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="settlement" class="text-sm space-y-1 mb-3">
-              <div>Deposit: {{ formatCurrency(settlement.depositAmount) }}</div>
-              <div>Damage charges: {{ formatCurrency(settlement.totalDamageCharges) }}</div>
-              <div>Other deductions: {{ formatCurrency(settlement.otherDeductions) }}</div>
-              <div class="font-medium text-gray-900 dark:text-white">Refund: {{ formatCurrency(settlement.refundAmount) }}</div>
-              <div><StatusBadge :status="settlement.status" /></div>
-              <UButton
-                v-if="isAdmin && settlement.status === 'PENDING'"
-                size="xs"
-                color="success"
-                variant="soft"
-                :loading="settling"
-                class="mt-2"
-                @click="onSettle"
-              >
-                Settle
-              </UButton>
-            </div>
-            <DynamicForm
-              v-else-if="isAdmin"
-              v-model="settlementForm"
-              :fields="settlementFields"
-              :loading="settlementSaving"
-              :error="settlementError"
-              submit-label="Calculate settlement"
-              @submit="onCreateSettlement"
-            />
-            <div v-else class="text-sm text-gray-400">No settlement calculated yet.</div>
-          </div>
-
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Unit release
-            </h3>
-            <div v-if="releaseLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="unitRelease" class="text-sm space-y-1">
-              <div>Released {{ formatDate(unitRelease.releaseDate) }} by {{ unitRelease.releasedBy ?? '—' }}</div>
-              <div v-if="unitRelease.notes" class="text-gray-400">{{ unitRelease.notes }}</div>
-            </div>
-            <UButton
-              v-else-if="isAdmin"
-              size="sm"
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-door-closed"
-              :loading="releasing"
-              @click="onReleaseUnit"
-            >
-              Release unit
-            </UButton>
-            <div v-else class="text-sm text-gray-400">Unit not released yet.</div>
+    <UModal
+      v-model:open="showDamageCharges"
+      :title="`Damage charges · ${damageChargesTarget?.tenantName ?? ''} — Unit ${damageChargesTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="damageChargesLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="damageCharges.length === 0" class="text-sm text-gray-400 mb-3">No damage charges recorded.</div>
+        <div v-else class="space-y-1.5 mb-4">
+          <div
+            v-for="d in damageCharges"
+            :key="d.id"
+            class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
+          >
+            <span class="text-gray-600 dark:text-gray-300">{{ d.description }}</span>
+            <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(d.amount) }}</span>
           </div>
         </div>
+        <DynamicForm
+          v-if="isAdmin"
+          v-model="damageChargeForm"
+          :fields="damageChargeFields"
+          :loading="damageChargeSaving"
+          :error="damageChargeError"
+          submit-label="Add charge"
+          @submit="onAddDamageCharge"
+        />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="showSettlement"
+      :title="`Deposit settlement · ${settlementTarget?.tenantName ?? ''} — Unit ${settlementTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="settlementLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="settlement" class="text-sm space-y-1 mb-3">
+          <div>Deposit: {{ formatCurrency(settlement.depositAmount) }}</div>
+          <div>Damage charges: {{ formatCurrency(settlement.totalDamageCharges) }}</div>
+          <div>Other deductions: {{ formatCurrency(settlement.otherDeductions) }}</div>
+          <div class="font-medium text-gray-900 dark:text-white">Refund: {{ formatCurrency(settlement.refundAmount) }}</div>
+          <div><StatusBadge :status="settlement.status" /></div>
+          <UButton
+            v-if="isAdmin && settlement.status === 'PENDING'"
+            size="xs"
+            color="success"
+            variant="soft"
+            :loading="settling"
+            class="mt-2"
+            @click="onSettle"
+          >
+            Settle
+          </UButton>
+        </div>
+        <DynamicForm
+          v-else-if="isAdmin"
+          v-model="settlementForm"
+          :fields="settlementFields"
+          :loading="settlementSaving"
+          :error="settlementError"
+          submit-label="Calculate settlement"
+          @submit="onCreateSettlement"
+        />
+        <div v-else class="text-sm text-gray-400">No settlement calculated yet.</div>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="showRelease"
+      :title="`Unit release · ${releaseTarget?.tenantName ?? ''} — Unit ${releaseTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="releaseLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="unitRelease" class="text-sm space-y-1">
+          <div>Released {{ formatDate(unitRelease.releaseDate) }} by {{ unitRelease.releasedBy ?? '—' }}</div>
+          <div v-if="unitRelease.notes" class="text-gray-400">{{ unitRelease.notes }}</div>
+        </div>
+        <UButton
+          v-else-if="isAdmin"
+          size="sm"
+          color="neutral"
+          variant="soft"
+          icon="i-lucide-door-closed"
+          :loading="releasing"
+          @click="onReleaseUnit"
+        >
+          Release unit
+        </UButton>
+        <div v-else class="text-sm text-gray-400">Unit not released yet.</div>
       </template>
     </UModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { ColumnDef, FieldDef } from '#shared/types'
+import type { ColumnDef, FieldDef, RowAction } from '#shared/types'
 import type {
   CreateDamageChargePayload,
   CreateMoveOutPayload,
@@ -438,8 +416,14 @@ async function onRejectSubmit(values: Record<string, any>) {
   }
 }
 
-// Manage — inspection + damage charges + settlement + unit release
-const { open: showManage, target: manageTarget, openWith: openManageWith } = useTargetModal<MoveOutRequest>()
+// Inspection, Damage charges, Deposit settlement, and Unit release each get
+// their own modal/target (rather than one general-purpose "Manage"
+// catch-all) — distinct concerns, even though damage charges happen to be
+// read off the inspection record under the hood (see loadDamageCharges).
+const { open: showInspection, target: inspectionTarget, openWith: openInspectionWith } = useTargetModal<MoveOutRequest>()
+const { open: showDamageCharges, target: damageChargesTarget, openWith: openDamageChargesWith } = useTargetModal<MoveOutRequest>()
+const { open: showSettlement, target: settlementTarget, openWith: openSettlementWith } = useTargetModal<MoveOutRequest>()
+const { open: showRelease, target: releaseTarget, openWith: openReleaseWith } = useTargetModal<MoveOutRequest>()
 
 const inspection = ref<MoveOutInspection | null>(null)
 const inspectionLoading = ref(false)
@@ -496,9 +480,9 @@ async function loadDamageCharges(id: number) {
   }
 }
 
-watch(showManage, async (value) => {
-  if (!value || !manageTarget.value) return
-  const id = manageTarget.value.id
+watch(showInspection, async (value) => {
+  if (!value || !inspectionTarget.value) return
+  const id = inspectionTarget.value.id
 
   inspection.value = null
   inspectionForm.value = { inspectionDate: new Date().toISOString().slice(0, 10) }
@@ -512,10 +496,18 @@ watch(showManage, async (value) => {
   } finally {
     inspectionLoading.value = false
   }
+})
 
+watch(showDamageCharges, async (value) => {
+  if (!value || !damageChargesTarget.value) return
   damageChargeForm.value = {}
   damageChargeError.value = ''
-  await loadDamageCharges(id)
+  await loadDamageCharges(damageChargesTarget.value.id)
+})
+
+watch(showSettlement, async (value) => {
+  if (!value || !settlementTarget.value) return
+  const id = settlementTarget.value.id
 
   settlement.value = null
   settlementForm.value = {}
@@ -529,11 +521,14 @@ watch(showManage, async (value) => {
   } finally {
     settlementLoading.value = false
   }
+})
 
+watch(showRelease, async (value) => {
+  if (!value || !releaseTarget.value) return
   unitRelease.value = null
   releaseLoading.value = true
   try {
-    unitRelease.value = await getUnitRelease(id)
+    unitRelease.value = await getUnitRelease(releaseTarget.value.id)
   } catch {
     unitRelease.value = null
   } finally {
@@ -542,7 +537,7 @@ watch(showManage, async (value) => {
 })
 
 async function onRecordInspection(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!inspectionTarget.value) return
   inspectionSaving.value = true
   inspectionError.value = ''
   const payload: CreateInspectionPayload = {
@@ -552,9 +547,8 @@ async function onRecordInspection(values: Record<string, any>) {
     notes: values.notes || undefined
   }
   try {
-    inspection.value = await recordInspection(manageTarget.value.id, payload)
+    inspection.value = await recordInspection(inspectionTarget.value.id, payload)
     toast.add({ title: 'Inspection recorded', color: 'success' })
-    await loadDamageCharges(manageTarget.value.id)
     await load()
   } catch (err) {
     inspectionError.value = apiErrorMessage(err)
@@ -564,15 +558,15 @@ async function onRecordInspection(values: Record<string, any>) {
 }
 
 async function onAddDamageCharge(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!damageChargesTarget.value) return
   damageChargeSaving.value = true
   damageChargeError.value = ''
   const payload: CreateDamageChargePayload = { description: values.description, amount: values.amount }
   try {
-    await addDamageCharge(manageTarget.value.id, payload)
+    await addDamageCharge(damageChargesTarget.value.id, payload)
     damageChargeForm.value = {}
     toast.add({ title: 'Damage charge added', color: 'success' })
-    await loadDamageCharges(manageTarget.value.id)
+    await loadDamageCharges(damageChargesTarget.value.id)
     await load()
   } catch (err) {
     damageChargeError.value = apiErrorMessage(err)
@@ -582,11 +576,11 @@ async function onAddDamageCharge(values: Record<string, any>) {
 }
 
 async function onCreateSettlement(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!settlementTarget.value) return
   settlementSaving.value = true
   settlementError.value = ''
   try {
-    settlement.value = await createSettlement(manageTarget.value.id, {
+    settlement.value = await createSettlement(settlementTarget.value.id, {
       otherDeductions: values.otherDeductions || undefined,
       notes: values.notes || undefined
     })
@@ -600,10 +594,10 @@ async function onCreateSettlement(values: Record<string, any>) {
 }
 
 async function onSettle() {
-  if (!manageTarget.value) return
+  if (!settlementTarget.value) return
   settling.value = true
   try {
-    settlement.value = await settleDeposit(manageTarget.value.id)
+    settlement.value = await settleDeposit(settlementTarget.value.id)
     toast.add({ title: 'Deposit settled', color: 'success' })
     await load()
   } catch (err) {
@@ -614,10 +608,10 @@ async function onSettle() {
 }
 
 async function onReleaseUnit() {
-  if (!manageTarget.value) return
+  if (!releaseTarget.value) return
   releasing.value = true
   try {
-    unitRelease.value = await releaseUnit(manageTarget.value.id, {})
+    unitRelease.value = await releaseUnit(releaseTarget.value.id, {})
     toast.add({ title: 'Unit released', color: 'success' })
     await load()
   } catch (err) {
@@ -640,5 +634,18 @@ function clearFilters() {
   filter.leaseId = undefined
   filter.status = undefined
   load()
+}
+
+function moveOutActions(row: MoveOutRequest): RowAction[] {
+  const actions: RowAction[] = []
+  if (isAdmin.value && row.status === 'PENDING') {
+    actions.push({ label: 'Approve', icon: 'i-lucide-check', color: 'success', onClick: () => openApproveWith(row) })
+    actions.push({ label: 'Reject', icon: 'i-lucide-x', color: 'error', onClick: () => openRejectWith(row) })
+  }
+  actions.push({ label: 'Inspection', icon: 'i-lucide-clipboard-check', onClick: () => openInspectionWith(row) })
+  actions.push({ label: 'Damage charges', icon: 'i-lucide-hammer', onClick: () => openDamageChargesWith(row) })
+  actions.push({ label: 'Deposit settlement', icon: 'i-lucide-calculator', onClick: () => openSettlementWith(row) })
+  actions.push({ label: 'Unit release', icon: 'i-lucide-door-closed', onClick: () => openReleaseWith(row) })
+  return actions
 }
 </script>

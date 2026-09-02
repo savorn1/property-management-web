@@ -8,21 +8,12 @@
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
         <UInput
-          v-model="filter.name"
-          placeholder="Search name"
+          v-model="search"
+          placeholder="Search name or category"
           icon="i-lucide-search"
           class="w-56"
-          @keyup.enter="load"
         />
-        <UInput
-          v-model="filter.category"
-          placeholder="Category"
-          icon="i-lucide-tag"
-          class="w-48"
-          @keyup.enter="load"
-        />
-        <USelect v-model="filter.active" :items="activeFilterOptions" placeholder="Status" class="w-40" />
-        <UButton size="sm" color="neutral" variant="soft" icon="i-lucide-search" @click="load">Search</UButton>
+        <USelect v-model="filter.active" :items="activeFilterOptions" placeholder="Status" class="w-32" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -159,9 +150,7 @@ const rows = ref<Vendor[]>([])
 const loading = ref(false)
 const error = ref('')
 
-const filter = reactive<{ name: string; category: string; active: boolean | undefined }>({
-  name: '',
-  category: '',
+const filter = reactive<{ active: boolean | undefined }>({
   active: undefined
 })
 const activeFilterOptions = [
@@ -175,7 +164,10 @@ const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   direction: 'desc'
 })
 
-const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
+const { page, pageSize, total, rows: pagedRows, truncated, search } = useClientTable(rows, {
+  pageSize: 10,
+  searchFields: ['name', 'category']
+})
 
 const columns: ColumnDef<Vendor>[] = [
   { key: 'name', sortable: true },
@@ -191,8 +183,6 @@ async function load() {
   error.value = ''
   try {
     const res = await list({
-      name: filter.name || undefined,
-      category: filter.category || undefined,
       active: filter.active,
       sortBy: sort.value?.column,
       sortOrder: sort.value?.direction,
@@ -285,11 +275,10 @@ onMounted(load)
 watch(sort, load)
 watch(() => filter.active, load)
 
-const hasActiveFilter = computed(() => filter.name !== '' || filter.category !== '' || filter.active !== undefined)
+const hasActiveFilter = computed(() => search.value !== '' || filter.active !== undefined)
 
 function clearFilters() {
-  filter.name = ''
-  filter.category = ''
+  search.value = ''
   filter.active = undefined
   load()
 }

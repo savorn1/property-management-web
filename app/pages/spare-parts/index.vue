@@ -8,15 +8,13 @@
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
         <UInput
-          v-model="filter.name"
+          v-model="search"
           placeholder="Search name"
           icon="i-lucide-search"
           class="w-56"
-          @keyup.enter="load"
         />
-        <USelect v-model="filter.vendorId" :items="vendorFilterOptions" placeholder="Vendor" class="w-56" />
-        <USelect v-model="filter.active" :items="activeFilterOptions" placeholder="Status" class="w-40" />
-        <UButton size="sm" color="neutral" variant="soft" icon="i-lucide-search" @click="load">Search</UButton>
+        <USelect v-model="filter.vendorId" :items="vendorFilterOptions" placeholder="Vendor" class="w-48" />
+        <USelect v-model="filter.active" :items="activeFilterOptions" placeholder="Status" class="w-32" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -178,8 +176,7 @@ const rows = ref<SparePart[]>([])
 const loading = ref(false)
 const error = ref('')
 
-const filter = reactive<{ name: string; vendorId: number | undefined; active: boolean | undefined }>({
-  name: '',
+const filter = reactive<{ vendorId: number | undefined; active: boolean | undefined }>({
   vendorId: undefined,
   active: undefined
 })
@@ -202,7 +199,10 @@ const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   direction: 'desc'
 })
 
-const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
+const { page, pageSize, total, rows: pagedRows, truncated, search } = useClientTable(rows, {
+  pageSize: 10,
+  searchFields: ['name']
+})
 
 const columns: ColumnDef<SparePart>[] = [
   { key: 'name', sortable: true },
@@ -219,7 +219,6 @@ async function load() {
   error.value = ''
   try {
     const res = await list({
-      name: filter.name || undefined,
       vendorId: filter.vendorId,
       active: filter.active,
       sortBy: sort.value?.column,
@@ -378,11 +377,11 @@ watch(sort, load)
 watch(() => [filter.vendorId, filter.active], load)
 
 const hasActiveFilter = computed(
-  () => filter.name !== '' || filter.vendorId !== undefined || filter.active !== undefined
+  () => search.value !== '' || filter.vendorId !== undefined || filter.active !== undefined
 )
 
 function clearFilters() {
-  filter.name = ''
+  search.value = ''
   filter.vendorId = undefined
   filter.active = undefined
   load()

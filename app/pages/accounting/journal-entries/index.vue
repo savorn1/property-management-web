@@ -7,9 +7,9 @@
 
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
-        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-40" />
-        <USelect v-model="filter.sourceType" :items="sourceTypeFilterOptions" placeholder="Source" class="w-48" />
-        <USelect v-model="filter.financialPeriodId" :items="periodFilterOptions" placeholder="Financial period" class="w-52" />
+        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-32" />
+        <USelect v-model="filter.sourceType" :items="sourceTypeFilterOptions" placeholder="Source" class="w-40" />
+        <USelect v-model="filter.financialPeriodId" :items="periodFilterOptions" placeholder="Financial period" class="w-44" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"

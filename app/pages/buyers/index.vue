@@ -8,20 +8,11 @@
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
         <UInput
-          v-model="filter.fullName"
-          placeholder="Search name"
+          v-model="search"
+          placeholder="Search name or email"
           icon="i-lucide-search"
           class="w-56"
-          @keyup.enter="load"
         />
-        <UInput
-          v-model="filter.email"
-          placeholder="Email"
-          icon="i-lucide-mail"
-          class="w-56"
-          @keyup.enter="load"
-        />
-        <UButton size="sm" color="neutral" variant="soft" icon="i-lucide-search" @click="load">Search</UButton>
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -130,14 +121,15 @@ const rows = ref<Buyer[]>([])
 const loading = ref(false)
 const error = ref('')
 
-const filter = reactive({ fullName: '', email: '' })
-
 const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   column: 'id',
   direction: 'desc'
 })
 
-const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
+const { page, pageSize, total, rows: pagedRows, truncated, search } = useClientTable(rows, {
+  pageSize: 10,
+  searchFields: ['fullName', 'email']
+})
 
 const columns: ColumnDef<Buyer>[] = [
   { key: 'fullName', label: 'Name', sortable: true },
@@ -151,8 +143,6 @@ async function load() {
   error.value = ''
   try {
     const res = await list({
-      fullName: filter.fullName || undefined,
-      email: filter.email || undefined,
       sortBy: sort.value?.column,
       sortOrder: sort.value?.direction,
       size: 200
@@ -219,11 +209,10 @@ const {
 onMounted(load)
 watch(sort, load)
 
-const hasActiveFilter = computed(() => filter.fullName !== '' || filter.email !== '')
+const hasActiveFilter = computed(() => search.value !== '')
 
 function clearFilters() {
-  filter.fullName = ''
-  filter.email = ''
+  search.value = ''
   load()
 }
 </script>

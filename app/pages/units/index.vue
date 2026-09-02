@@ -11,26 +11,25 @@
           v-model="filter.unitTypeId"
           :items="unitTypeFilterOptions"
           placeholder="Unit type"
-          class="w-56"
+          class="w-48"
         />
         <USelect
           v-model="filter.occupancyStatus"
           :items="occupancyStatusFilterOptions"
           placeholder="Occupancy"
-          class="w-40"
+          class="w-32"
         />
         <USelect
           v-model="filter.saleStatus"
           :items="saleStatusFilterOptions"
           placeholder="Sale status"
-          class="w-40"
+          class="w-32"
         />
         <UInput
-          v-model="filter.unitNumber"
+          v-model="search"
           placeholder="Unit number"
           icon="i-lucide-search"
           class="w-44"
-          @keyup.enter="load"
         />
         <UButton
           v-if="hasActiveFilter"
@@ -525,12 +524,10 @@ const filter = reactive<{
   unitTypeId: number | undefined
   occupancyStatus: OccupancyStatus | undefined
   saleStatus: SaleStatus | undefined
-  unitNumber: string
 }>({
   unitTypeId: initialUnitTypeId,
   occupancyStatus: initialOccupancyStatus,
-  saleStatus: initialSaleStatus,
-  unitNumber: ''
+  saleStatus: initialSaleStatus
 })
 
 const unitTypeOptions = ref<{ label: string; value: number }[]>([])
@@ -581,7 +578,10 @@ const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   direction: 'asc'
 })
 
-const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
+const { page, pageSize, total, rows: pagedRows, truncated, search } = useClientTable(rows, {
+  pageSize: 10,
+  searchFields: ['unitNumber']
+})
 
 const columns: ColumnDef<Unit>[] = [
   { key: 'unitNumber', label: 'Unit #', sortable: true },
@@ -600,7 +600,6 @@ async function load() {
       unitTypeId: filter.unitTypeId,
       occupancyStatus: filter.occupancyStatus,
       saleStatus: filter.saleStatus,
-      unitNumber: filter.unitNumber || undefined,
       sortBy: sort.value?.column,
       sortOrder: sort.value?.direction,
       size: 200
@@ -830,14 +829,14 @@ const hasActiveFilter = computed(
     filter.unitTypeId !== undefined ||
     filter.occupancyStatus !== undefined ||
     filter.saleStatus !== undefined ||
-    filter.unitNumber !== ''
+    search.value !== ''
 )
 
 function clearFilters() {
   filter.unitTypeId = undefined
   filter.occupancyStatus = undefined
   filter.saleStatus = undefined
-  filter.unitNumber = ''
+  search.value = ''
   load()
 }
 

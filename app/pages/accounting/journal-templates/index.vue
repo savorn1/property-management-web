@@ -7,8 +7,8 @@
 
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
-        <USelect v-model="filter.triggerEvent" :items="triggerEventFilterOptions" placeholder="Trigger event" class="w-52" />
-        <USelect v-model="filter.active" :items="activeFilterOptions" placeholder="Status" class="w-40" />
+        <USelect v-model="filter.triggerEvent" :items="triggerEventFilterOptions" placeholder="Trigger event" class="w-44" />
+        <USelect v-model="filter.active" :items="activeFilterOptions" placeholder="Status" class="w-32" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -118,7 +118,7 @@
             </div>
             <div class="mb-2">
               <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Scheme (for the account picker below)</label>
-              <USelect v-model="createSchemeId" :items="schemeOptions" placeholder="Scheme" class="w-56" />
+              <USelect v-model="createSchemeId" :items="schemeOptions" placeholder="Scheme" class="w-48" />
             </div>
 
             <div class="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
@@ -194,7 +194,7 @@
             </div>
             <div class="mb-2">
               <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Scheme (for the account picker below)</label>
-              <USelect v-model="editSchemeId" :items="schemeOptions" placeholder="Scheme" class="w-56" />
+              <USelect v-model="editSchemeId" :items="schemeOptions" placeholder="Scheme" class="w-48" />
             </div>
 
             <div class="rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">

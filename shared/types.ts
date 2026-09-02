@@ -129,3 +129,15 @@ export interface ColumnDef<T = any> {
   /** link: destination path for the row. */
   href?: (row: T) => string
 }
+
+// ── Row actions ────────────────────────────────────────────────────────────
+// One entry in a DataTable row's action buttons. Rendered by <RowActions>,
+// which shows the first `max` inline and collapses the rest into a "…" menu.
+export interface RowAction {
+  label: string
+  icon: string
+  color?: 'primary' | 'secondary' | 'success' | 'info' | 'warning' | 'error' | 'neutral'
+  /** Shows a spinner in place of the icon — for an action with its own async in-flight state. */
+  loading?: boolean
+  onClick: () => void
+}

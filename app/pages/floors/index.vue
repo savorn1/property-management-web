@@ -11,9 +11,9 @@
           v-model="filter.buildingId"
           :items="buildingFilterOptions"
           placeholder="Building"
-          class="w-56"
+          class="w-48"
         />
-        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-44" />
+        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-36" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"

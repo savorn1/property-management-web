@@ -8,23 +8,22 @@
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
         <UInput
-          v-model="filter.username"
+          v-model="search"
           placeholder="Search username"
           icon="i-lucide-search"
           class="w-56"
-          @keyup.enter="load"
         />
         <USelect
           v-model="filter.role"
           :items="roleFilterOptions"
           placeholder="Role"
-          class="w-40"
+          class="w-32"
         />
         <USelect
           v-model="filter.enabled"
           :items="statusFilterOptions"
           placeholder="Status"
-          class="w-40"
+          class="w-32"
         />
         <UButton
           v-if="hasActiveFilter"
@@ -185,8 +184,7 @@ const rows = ref<AdminUser[]>([])
 const loading = ref(false)
 const error = ref('')
 
-const filter = reactive<{ username: string; role: Role | undefined; enabled: boolean | undefined }>({
-  username: '',
+const filter = reactive<{ role: Role | undefined; enabled: boolean | undefined }>({
   role: undefined,
   enabled: undefined
 })
@@ -207,7 +205,10 @@ const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   direction: 'desc'
 })
 
-const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
+const { page, pageSize, total, rows: pagedRows, truncated, search } = useClientTable(rows, {
+  pageSize: 10,
+  searchFields: ['username']
+})
 
 const columns: ColumnDef<AdminUser>[] = [
  // { key: 'id', label: 'ID', sortable: true },
@@ -223,7 +224,6 @@ async function load() {
   error.value = ''
   try {
     const res = await list({
-      username: filter.username || undefined,
       role: filter.role,
       enabled: filter.enabled,
       sortBy: sort.value?.column,
@@ -329,15 +329,12 @@ onMounted(load)
 watch(sort, load)
 watch(() => [filter.role, filter.enabled], load)
 
-const hasActiveFilter = computed(() => filter.username !== '' || filter.role !== undefined || filter.enabled !== undefined)
+const hasActiveFilter = computed(() => search.value !== '' || filter.role !== undefined || filter.enabled !== undefined)
 
 function clearFilters() {
-  filter.username = ''
+  search.value = ''
   filter.role = undefined
   filter.enabled = undefined
-  // `username` alone isn't in the reactive watch above (it only reloads on
-  // Enter), so clearing it without touching role/status wouldn't otherwise
-  // trigger a reload — call explicitly to cover that case.
   load()
 }
 </script>

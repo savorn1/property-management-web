@@ -11,14 +11,13 @@
           v-model="filter.floorId"
           :items="floorFilterOptions"
           placeholder="Floor"
-          class="w-56"
+          class="w-48"
         />
         <UInput
-          v-model="filter.name"
+          v-model="search"
           placeholder="Search name"
           icon="i-lucide-search"
           class="w-56"
-          @keyup.enter="load"
         />
         <UButton
           v-if="hasActiveFilter"
@@ -156,9 +155,8 @@ const loading = ref(false)
 const error = ref('')
 
 const initialFloorId = Number(route.query.floorId) || undefined
-const filter = reactive<{ floorId: number | undefined; name: string }>({
-  floorId: initialFloorId,
-  name: ''
+const filter = reactive<{ floorId: number | undefined }>({
+  floorId: initialFloorId
 })
 
 const floorOptions = ref<{ label: string; value: number }[]>([])
@@ -177,7 +175,10 @@ const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   direction: 'desc'
 })
 
-const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
+const { page, pageSize, total, rows: pagedRows, truncated, search } = useClientTable(rows, {
+  pageSize: 10,
+  searchFields: ['name']
+})
 
 const columns: ColumnDef<UnitType>[] = [
   { key: 'name', sortable: true },
@@ -195,7 +196,6 @@ async function load() {
   try {
     const res = await list({
       floorId: filter.floorId,
-      name: filter.name || undefined,
       sortBy: sort.value?.column,
       sortOrder: sort.value?.direction,
       size: 200
@@ -289,11 +289,11 @@ onMounted(async () => {
 watch(sort, load)
 watch(() => filter.floorId, load)
 
-const hasActiveFilter = computed(() => filter.floorId !== undefined || filter.name !== '')
+const hasActiveFilter = computed(() => filter.floorId !== undefined || search.value !== '')
 
 function clearFilters() {
   filter.floorId = undefined
-  filter.name = ''
+  search.value = ''
   load()
 }
 </script>

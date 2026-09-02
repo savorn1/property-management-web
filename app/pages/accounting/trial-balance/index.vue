@@ -8,7 +8,7 @@
       <div class="flex flex-wrap items-end gap-3">
         <div>
           <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Scheme</label>
-          <USelect v-model="filter.schemeId" :items="schemeOptions" placeholder="Scheme" class="w-56" />
+          <USelect v-model="filter.schemeId" :items="schemeOptions" placeholder="Scheme" class="w-48" />
         </div>
         <div>
           <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">As of date</label>

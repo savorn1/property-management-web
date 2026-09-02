@@ -8,22 +8,13 @@
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
         <UInput
-          v-model="filter.name"
-          placeholder="Search name"
+          v-model="search"
+          placeholder="Search name or city"
           icon="i-lucide-search"
           class="w-56"
-          @keyup.enter="load"
         />
-        <UInput
-          v-model="filter.city"
-          placeholder="City"
-          icon="i-lucide-map-pin"
-          class="w-44"
-          @keyup.enter="load"
-        />
-        <USelect v-model="filter.type" :items="typeFilterOptions" placeholder="Type" class="w-44" />
-        <USelect v-model="filter.zoneId" :items="zoneFilterOptions" placeholder="Zone" class="w-44" />
-        <UButton size="sm" color="neutral" variant="soft" icon="i-lucide-search" @click="load">Search</UButton>
+        <USelect v-model="filter.type" :items="typeFilterOptions" placeholder="Type" class="w-36" />
+        <USelect v-model="filter.zoneId" :items="zoneFilterOptions" placeholder="Zone" class="w-36" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -62,35 +53,7 @@
         @select="(row) => navigateTo(`/properties/${row.id}`)"
       >
         <template #actions-data="{ row }">
-          <div class="flex items-center gap-2">
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-eye"
-              @click.stop="navigateTo(`/properties/${row.id}`)"
-            >
-              Overview
-            </UButton>
-            <UButton
-              size="xs"
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-building-2"
-              @click.stop="navigateTo(`/buildings?propertyId=${row.id}`)"
-            >
-              Buildings
-            </UButton>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-settings-2" @click.stop="openManageWith(row)">
-              Manage
-            </UButton>
-            <UButton size="xs" color="primary" variant="soft" icon="i-lucide-pencil" @click.stop="openEdit(row)">
-              Edit
-            </UButton>
-            <UButton size="xs" color="error" variant="soft" icon="i-lucide-trash-2" @click.stop="confirmDelete = row">
-              Delete
-            </UButton>
-          </div>
+          <RowActions :actions="propertyActions(row)" />
         </template>
         <template #empty-state>
           <EmptyState
@@ -157,127 +120,118 @@
       @confirm="onDelete"
     />
 
-    <UModal v-model:open="showManage" :title="`Manage · ${manageTarget?.name ?? ''}`" :ui="{ content: 'sm:max-w-2xl' }">
+    <UModal v-model:open="showImages" :title="`Images · ${imagesTarget?.name ?? ''}`">
       <template #body>
-        <div class="space-y-6">
-          <div>
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Images
-            </h3>
-            <div v-if="imagesLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="images.length === 0" class="text-sm text-gray-400 mb-3">No images uploaded yet.</div>
-            <div v-else class="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-4">
-              <div v-for="img in images" :key="img.id" class="relative group">
-                <img
-                  v-if="imageUrls[img.id]"
-                  :src="imageUrls[img.id]"
-                  :alt="img.caption ?? img.fileName"
-                  class="w-full h-20 object-cover rounded border border-gray-200 dark:border-gray-800 cursor-pointer"
-                  @click="openImageLightbox(img.id)"
-                >
-                <div v-else class="w-full h-20 rounded border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-300">
-                  <UIcon name="i-lucide-image" class="size-5" />
-                </div>
-                <span
-                  v-if="img.primary"
-                  class="absolute top-1 left-1 bg-primary-500 text-white text-[10px] px-1.5 py-0.5 rounded"
-                >
-                  Primary
-                </span>
-                <div v-if="isAdmin" class="absolute inset-x-0 bottom-0 flex justify-center gap-1 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity py-1">
-                  <UButton
-                    v-if="!img.primary"
-                    size="xs"
-                    color="neutral"
-                    variant="solid"
-                    icon="i-lucide-star"
-                    @click="onSetPrimaryImage(img)"
-                  />
-                  <UButton
-                    size="xs"
-                    color="error"
-                    variant="solid"
-                    icon="i-lucide-trash-2"
-                    @click="onDeleteImage(img)"
-                  />
-                </div>
-              </div>
+        <div v-if="imagesLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="images.length === 0" class="text-sm text-gray-400 mb-3">No images uploaded yet.</div>
+        <div v-else class="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-4">
+          <div v-for="img in images" :key="img.id" class="relative group">
+            <img
+              v-if="imageUrls[img.id]"
+              :src="imageUrls[img.id]"
+              :alt="img.caption ?? img.fileName"
+              class="w-full h-20 object-cover rounded border border-gray-200 dark:border-gray-800 cursor-pointer"
+              @click="openImageLightbox(img.id)"
+            >
+            <div v-else class="w-full h-20 rounded border border-gray-200 dark:border-gray-800 flex items-center justify-center text-gray-300">
+              <UIcon name="i-lucide-image" class="size-5" />
             </div>
-            <ImageUploadCropField v-if="isAdmin" :upload="uploadImageForTarget" @uploaded="onImageUploaded" />
-            <ImageLightbox v-model:open="showImageLightbox" v-model:index="imageLightboxIndex" :images="imageLightboxItems" />
-          </div>
-
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Documents
-            </h3>
-            <div v-if="documentsLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="documents.length === 0" class="text-sm text-gray-400 mb-3">
-              No documents uploaded yet.
+            <span
+              v-if="img.primary"
+              class="absolute top-1 left-1 bg-primary-500 text-white text-[10px] px-1.5 py-0.5 rounded"
+            >
+              Primary
+            </span>
+            <div v-if="isAdmin" class="absolute inset-x-0 bottom-0 flex justify-center gap-1 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity py-1">
+              <UButton
+                v-if="!img.primary"
+                size="xs"
+                color="neutral"
+                variant="solid"
+                icon="i-lucide-star"
+                @click="onSetPrimaryImage(img)"
+              />
+              <UButton
+                size="xs"
+                color="error"
+                variant="solid"
+                icon="i-lucide-trash-2"
+                @click="onDeleteImage(img)"
+              />
             </div>
-            <div v-else class="space-y-1.5 mb-4">
-              <div
-                v-for="d in documents"
-                :key="d.id"
-                class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
-              >
-                <div>
-                  <button class="text-primary-500 hover:underline text-left" @click="onDownloadDocument(d)">{{ d.fileName }}</button>
-                  <span v-if="d.description" class="text-gray-400"> — {{ d.description }}</span>
-                  <div class="text-xs text-gray-400">{{ formatDateTime(d.createdAt) }} · {{ d.uploadedBy ?? '—' }}</div>
-                </div>
-                <UButton
-                  v-if="isAdmin"
-                  size="xs"
-                  color="error"
-                  variant="ghost"
-                  icon="i-lucide-trash-2"
-                  @click="onDeleteDocument(d)"
-                />
-              </div>
-            </div>
-            <FileUploadField v-if="isAdmin" :upload="uploadDocumentForTarget" @uploaded="onDocumentUploaded" />
-          </div>
-
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Certificates
-            </h3>
-            <div v-if="certificatesLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="certificates.length === 0" class="text-sm text-gray-400 mb-3">
-              No certificates uploaded yet.
-            </div>
-            <div v-else class="space-y-1.5 mb-4">
-              <div
-                v-for="c in certificates"
-                :key="c.id"
-                class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
-              >
-                <div>
-                  <button class="text-primary-500 hover:underline text-left" @click="onDownloadCertificate(c)">{{ c.fileName }}</button>
-                  <span v-if="c.description" class="text-gray-400"> — {{ c.description }}</span>
-                  <div class="text-xs text-gray-400">{{ formatDateTime(c.createdAt) }} · {{ c.uploadedBy ?? '—' }}</div>
-                </div>
-                <UButton
-                  v-if="isAdmin"
-                  size="xs"
-                  color="error"
-                  variant="ghost"
-                  icon="i-lucide-trash-2"
-                  @click="onDeleteCertificate(c)"
-                />
-              </div>
-            </div>
-            <FileUploadField v-if="isAdmin" :upload="uploadCertificateForTarget" @uploaded="onCertificateUploaded" />
           </div>
         </div>
+        <ImageUploadCropField v-if="isAdmin" :upload="uploadImageForTarget" @uploaded="onImageUploaded" />
+        <ImageLightbox v-model:open="showImageLightbox" v-model:index="imageLightboxIndex" :images="imageLightboxItems" />
+      </template>
+    </UModal>
+
+    <UModal v-model:open="showDocuments" :title="`Documents · ${documentsTarget?.name ?? ''}`">
+      <template #body>
+        <div v-if="documentsLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="documents.length === 0" class="text-sm text-gray-400 mb-3">
+          No documents uploaded yet.
+        </div>
+        <div v-else class="space-y-1.5 mb-4">
+          <div
+            v-for="d in documents"
+            :key="d.id"
+            class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
+          >
+            <div>
+              <button class="text-primary-500 hover:underline text-left" @click="onDownloadDocument(d)">{{ d.fileName }}</button>
+              <span v-if="d.description" class="text-gray-400"> — {{ d.description }}</span>
+              <div class="text-xs text-gray-400">{{ formatDateTime(d.createdAt) }} · {{ d.uploadedBy ?? '—' }}</div>
+            </div>
+            <UButton
+              v-if="isAdmin"
+              size="xs"
+              color="error"
+              variant="ghost"
+              icon="i-lucide-trash-2"
+              @click="onDeleteDocument(d)"
+            />
+          </div>
+        </div>
+        <FileUploadField v-if="isAdmin" :upload="uploadDocumentForTarget" @uploaded="onDocumentUploaded" />
+      </template>
+    </UModal>
+
+    <UModal v-model:open="showCertificates" :title="`Certificates · ${certificatesTarget?.name ?? ''}`">
+      <template #body>
+        <div v-if="certificatesLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="certificates.length === 0" class="text-sm text-gray-400 mb-3">
+          No certificates uploaded yet.
+        </div>
+        <div v-else class="space-y-1.5 mb-4">
+          <div
+            v-for="c in certificates"
+            :key="c.id"
+            class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
+          >
+            <div>
+              <button class="text-primary-500 hover:underline text-left" @click="onDownloadCertificate(c)">{{ c.fileName }}</button>
+              <span v-if="c.description" class="text-gray-400"> — {{ c.description }}</span>
+              <div class="text-xs text-gray-400">{{ formatDateTime(c.createdAt) }} · {{ c.uploadedBy ?? '—' }}</div>
+            </div>
+            <UButton
+              v-if="isAdmin"
+              size="xs"
+              color="error"
+              variant="ghost"
+              icon="i-lucide-trash-2"
+              @click="onDeleteCertificate(c)"
+            />
+          </div>
+        </div>
+        <FileUploadField v-if="isAdmin" :upload="uploadCertificateForTarget" @uploaded="onCertificateUploaded" />
       </template>
     </UModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import type { ColumnDef, FieldDef } from '#shared/types'
+import type { ColumnDef, FieldDef, RowAction } from '#shared/types'
 import type { PropertyItem, PropertyPayload, PropertyType } from '~/composables/useProperties'
 import type { PropertyDocument } from '~/composables/usePropertyDocuments'
 import type { PropertyCertificate } from '~/composables/usePropertyCertificates'
@@ -301,9 +255,7 @@ const rows = ref<PropertyItem[]>([])
 const loading = ref(false)
 const error = ref('')
 
-const filter = reactive<{ name: string; city: string; type: PropertyType | undefined; zoneId: number | undefined }>({
-  name: '',
-  city: '',
+const filter = reactive<{ type: PropertyType | undefined; zoneId: number | undefined }>({
   type: undefined,
   zoneId: undefined
 })
@@ -334,7 +286,10 @@ const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   direction: 'desc'
 })
 
-const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
+const { page, pageSize, total, rows: pagedRows, truncated, search } = useClientTable(rows, {
+  pageSize: 10,
+  searchFields: ['name', 'city']
+})
 
 const columns: ColumnDef<PropertyItem>[] = [
   { key: 'name', sortable: true },
@@ -352,8 +307,6 @@ async function load() {
   error.value = ''
   try {
     const res = await list({
-      name: filter.name || undefined,
-      city: filter.city || undefined,
       type: filter.type,
       zoneId: filter.zoneId,
       sortBy: sort.value?.column,
@@ -443,22 +396,33 @@ watch(sort, load)
 watch(() => [filter.type, filter.zoneId], load)
 
 const hasActiveFilter = computed(
-  () => filter.name !== '' || filter.city !== '' || filter.type !== undefined || filter.zoneId !== undefined
+  () => search.value !== '' || filter.type !== undefined || filter.zoneId !== undefined
 )
 
 function clearFilters() {
-  filter.name = ''
-  filter.city = ''
+  search.value = ''
   filter.type = undefined
   filter.zoneId = undefined
   load()
 }
 
-// Manage — Images + Documents + Certificates, all scoped to one property.
+// Images, Documents, and Certificates each get their own modal/target
+// (rather than one general-purpose "Manage" catch-all) — distinct,
+// self-contained concerns scoped to one property.
 const {
-  open: showManage,
-  target: manageTarget,
-  openWith: openManageWith
+  open: showImages,
+  target: imagesTarget,
+  openWith: openImagesWith
+} = useTargetModal<PropertyItem>()
+const {
+  open: showDocuments,
+  target: documentsTarget,
+  openWith: openDocumentsWith
+} = useTargetModal<PropertyItem>()
+const {
+  open: showCertificates,
+  target: certificatesTarget,
+  openWith: openCertificatesWith
 } = useTargetModal<PropertyItem>()
 
 // Images
@@ -467,14 +431,14 @@ const imagesLoading = ref(false)
 const imageUrls = ref<Record<number, string>>({})
 
 async function loadImages() {
-  if (!manageTarget.value) return
+  if (!imagesTarget.value) return
   imagesLoading.value = true
   try {
-    images.value = await listImages(manageTarget.value.id)
+    images.value = await listImages(imagesTarget.value.id)
     for (const url of Object.values(imageUrls.value)) URL.revokeObjectURL(url)
     const urls: Record<number, string> = {}
     for (const img of images.value) {
-      urls[img.id] = await getImageUrl(manageTarget.value.id, img.id)
+      urls[img.id] = await getImageUrl(imagesTarget.value.id, img.id)
     }
     imageUrls.value = urls
   } finally {
@@ -483,7 +447,7 @@ async function loadImages() {
 }
 
 function uploadImageForTarget(file: File, caption?: string, primary?: boolean) {
-  return uploadImage(manageTarget.value!.id, file, caption, primary)
+  return uploadImage(imagesTarget.value!.id, file, caption, primary)
 }
 
 const showImageLightbox = ref(false)
@@ -507,9 +471,9 @@ async function onImageUploaded() {
 }
 
 async function onSetPrimaryImage(img: PropertyImage) {
-  if (!manageTarget.value) return
+  if (!imagesTarget.value) return
   try {
-    await setPrimaryImage(manageTarget.value.id, img.id)
+    await setPrimaryImage(imagesTarget.value.id, img.id)
     toast.add({ title: 'Primary image updated', color: 'success' })
     await loadImages()
   } catch (err) {
@@ -518,9 +482,9 @@ async function onSetPrimaryImage(img: PropertyImage) {
 }
 
 async function onDeleteImage(img: PropertyImage) {
-  if (!manageTarget.value) return
+  if (!imagesTarget.value) return
   try {
-    await removeImage(manageTarget.value.id, img.id)
+    await removeImage(imagesTarget.value.id, img.id)
     toast.add({ title: 'Image deleted', color: 'success' })
     await loadImages()
   } catch (err) {
@@ -537,10 +501,10 @@ const certificates = ref<PropertyCertificate[]>([])
 const certificatesLoading = ref(false)
 
 async function loadDocuments() {
-  if (!manageTarget.value) return
+  if (!documentsTarget.value) return
   documentsLoading.value = true
   try {
-    documents.value = await listDocuments(manageTarget.value.id)
+    documents.value = await listDocuments(documentsTarget.value.id)
   } catch (err) {
     toast.add({ title: 'Could not load documents', description: apiErrorMessage(err), color: 'error' })
   } finally {
@@ -549,10 +513,10 @@ async function loadDocuments() {
 }
 
 async function loadCertificates() {
-  if (!manageTarget.value) return
+  if (!certificatesTarget.value) return
   certificatesLoading.value = true
   try {
-    certificates.value = await listCertificates(manageTarget.value.id)
+    certificates.value = await listCertificates(certificatesTarget.value.id)
   } catch (err) {
     toast.add({ title: 'Could not load certificates', description: apiErrorMessage(err), color: 'error' })
   } finally {
@@ -560,15 +524,18 @@ async function loadCertificates() {
   }
 }
 
-watch(showManage, (value) => {
-  if (!value) return
-  loadImages()
-  loadDocuments()
-  loadCertificates()
+watch(showImages, (value) => {
+  if (value) loadImages()
+})
+watch(showDocuments, (value) => {
+  if (value) loadDocuments()
+})
+watch(showCertificates, (value) => {
+  if (value) loadCertificates()
 })
 
 function uploadDocumentForTarget(file: File, description?: string) {
-  return uploadDocument(manageTarget.value!.id, file, description)
+  return uploadDocument(documentsTarget.value!.id, file, description)
 }
 
 async function onDocumentUploaded() {
@@ -577,9 +544,9 @@ async function onDocumentUploaded() {
 }
 
 async function onDeleteDocument(doc: PropertyDocument) {
-  if (!manageTarget.value) return
+  if (!documentsTarget.value) return
   try {
-    await removeDocument(manageTarget.value.id, doc.id)
+    await removeDocument(documentsTarget.value.id, doc.id)
     toast.add({ title: 'Document deleted', color: 'success' })
     await loadDocuments()
   } catch (err) {
@@ -588,16 +555,16 @@ async function onDeleteDocument(doc: PropertyDocument) {
 }
 
 async function onDownloadDocument(doc: PropertyDocument) {
-  if (!manageTarget.value) return
+  if (!documentsTarget.value) return
   try {
-    await downloadDocument(manageTarget.value.id, doc.id, doc.fileName)
+    await downloadDocument(documentsTarget.value.id, doc.id, doc.fileName)
   } catch (err) {
     toast.add({ title: 'Could not download document', description: apiErrorMessage(err), color: 'error' })
   }
 }
 
 function uploadCertificateForTarget(file: File, description?: string) {
-  return uploadCertificate(manageTarget.value!.id, file, description)
+  return uploadCertificate(certificatesTarget.value!.id, file, description)
 }
 
 async function onCertificateUploaded() {
@@ -606,9 +573,9 @@ async function onCertificateUploaded() {
 }
 
 async function onDeleteCertificate(cert: PropertyCertificate) {
-  if (!manageTarget.value) return
+  if (!certificatesTarget.value) return
   try {
-    await removeCertificate(manageTarget.value.id, cert.id)
+    await removeCertificate(certificatesTarget.value.id, cert.id)
     toast.add({ title: 'Certificate deleted', color: 'success' })
     await loadCertificates()
   } catch (err) {
@@ -617,11 +584,23 @@ async function onDeleteCertificate(cert: PropertyCertificate) {
 }
 
 async function onDownloadCertificate(cert: PropertyCertificate) {
-  if (!manageTarget.value) return
+  if (!certificatesTarget.value) return
   try {
-    await downloadCertificate(manageTarget.value.id, cert.id, cert.fileName)
+    await downloadCertificate(certificatesTarget.value.id, cert.id, cert.fileName)
   } catch (err) {
     toast.add({ title: 'Could not download certificate', description: apiErrorMessage(err), color: 'error' })
   }
+}
+
+function propertyActions(row: PropertyItem): RowAction[] {
+  return [
+    { label: 'Overview', icon: 'i-lucide-eye', onClick: () => navigateTo(`/properties/${row.id}`) },
+    { label: 'Edit', icon: 'i-lucide-pencil', color: 'primary', onClick: () => openEdit(row) },
+    { label: 'Delete', icon: 'i-lucide-trash-2', color: 'error', onClick: () => (confirmDelete.value = row) },
+    { label: 'Buildings', icon: 'i-lucide-building-2', onClick: () => navigateTo(`/buildings?propertyId=${row.id}`) },
+    { label: 'Images', icon: 'i-lucide-image', onClick: () => openImagesWith(row) },
+    { label: 'Documents', icon: 'i-lucide-folder', onClick: () => openDocumentsWith(row) },
+    { label: 'Certificates', icon: 'i-lucide-award', onClick: () => openCertificatesWith(row) }
+  ]
 }
 </script>

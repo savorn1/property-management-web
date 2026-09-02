@@ -7,9 +7,9 @@
 
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
-        <USelect v-model="filter.unitId" :items="unitFilterOptions" placeholder="Unit" class="w-56" />
-        <USelect v-model="filter.buyerId" :items="buyerFilterOptions" placeholder="Buyer" class="w-56" />
-        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-44" />
+        <USelect v-model="filter.unitId" :items="unitFilterOptions" placeholder="Unit" class="w-48" />
+        <USelect v-model="filter.buyerId" :items="buyerFilterOptions" placeholder="Buyer" class="w-48" />
+        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-36" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -40,51 +40,7 @@
         @refresh="load"
       >
         <template #actions-data="{ row }">
-          <div class="flex flex-wrap items-center gap-2">
-            <UButton
-              v-if="isAdmin && row.status === 'ACTIVE'"
-              size="xs"
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-percent"
-              @click="openDiscountWith(row)"
-            >
-              Discount
-            </UButton>
-            <UButton
-              v-if="isAdmin && row.status === 'ACTIVE'"
-              size="xs"
-              color="neutral"
-              variant="soft"
-              icon="i-lucide-user-round"
-              @click="openAgentWith(row)"
-            >
-              Agent
-            </UButton>
-            <UButton
-              v-if="isAdmin && row.agentId && !row.commissionPaid"
-              size="xs"
-              color="success"
-              variant="soft"
-              icon="i-lucide-check"
-              @click="openCommissionWith(row)"
-            >
-              Mark commission paid
-            </UButton>
-            <UButton
-              v-if="isAdmin && row.status === 'ACTIVE'"
-              size="xs"
-              color="error"
-              variant="soft"
-              icon="i-lucide-ban"
-              @click="openCancelWith(row)"
-            >
-              Cancel
-            </UButton>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-settings-2" @click="openManageWith(row)">
-              Manage
-            </UButton>
-          </div>
+          <RowActions :actions="agreementActions(row)" />
         </template>
         <template #empty-state>
           <EmptyState
@@ -182,241 +138,238 @@
     </UModal>
 
     <UModal
-      v-model:open="showManage"
-      :title="`Manage agreement · ${manageTarget?.buyerName ?? ''} — Unit ${manageTarget?.unitNumber ?? ''}`"
-      :ui="{ content: 'sm:max-w-3xl' }"
+      v-model:open="showPlan"
+      :title="`Payment plan · ${planTarget?.buyerName ?? ''} — Unit ${planTarget?.unitNumber ?? ''}`"
     >
       <template #body>
-        <div class="space-y-8 max-h-[70vh] overflow-y-auto pr-1">
-          <!-- Payment plan & installment schedule -->
-          <div>
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Payment plan
-            </h3>
-            <div v-if="planLoading" class="text-sm text-gray-400">Loading…</div>
-            <template v-else>
-              <DynamicForm
-                v-if="!paymentPlan"
-                v-model="planForm"
-                :fields="planFields"
-                :loading="planSaving"
-                :error="planError"
-                submit-label="Create plan"
-                @submit="onCreatePlan"
-              />
-              <div v-else class="space-y-3">
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                  <div><span class="text-gray-400">Down payment</span><br />{{ formatCurrency(paymentPlan.downPaymentAmount) }}</div>
-                  <div><span class="text-gray-400">Installments</span><br />{{ paymentPlan.installmentCount }}</div>
-                  <div><span class="text-gray-400">Frequency</span><br />{{ formatEnum(paymentPlan.installmentFrequency) }}</div>
-                  <div><span class="text-gray-400">First due</span><br />{{ formatDate(paymentPlan.firstInstallmentDate) }}</div>
-                </div>
-
-                <UButton
-                  v-if="!paymentPlan.scheduleGenerated"
-                  size="sm"
-                  icon="i-lucide-calendar-plus"
-                  :loading="generatingSchedule"
-                  @click="onGenerateSchedule"
-                >
-                  Generate schedule
-                </UButton>
-
-                <div v-else class="space-y-1.5">
-                  <div
-                    v-for="inst in schedule"
-                    :key="inst.id"
-                    class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
-                  >
-                    <div>
-                      <span class="font-medium text-gray-900 dark:text-white">#{{ inst.installmentNumber }}</span>
-                      <span class="text-gray-400"> · due {{ formatDate(inst.dueDate) }}</span>
-                      <StatusBadge :status="inst.status" class="ml-2" />
-                      <span v-if="inst.overdue" class="text-error-500 ml-1">overdue</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <span class="text-gray-600 dark:text-gray-300">
-                        {{ formatCurrency(inst.amountPaid) }} / {{ formatCurrency(inst.amount) }}
-                      </span>
-                      <UButton
-                        v-if="isAdmin && inst.status !== 'PAID'"
-                        size="xs"
-                        color="success"
-                        variant="soft"
-                        icon="i-lucide-plus"
-                        @click="openRecordPaymentWith(inst)"
-                      >
-                        Pay
-                      </UButton>
-                    </div>
-                  </div>
-                  <div v-if="schedule.length === 0" class="text-sm text-gray-400">No installments generated yet.</div>
-                </div>
-              </div>
-            </template>
-          </div>
-
-          <!-- Down payments / other agreement-level payments -->
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Payments
-            </h3>
-            <div v-if="paymentsLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="payments.length === 0" class="text-sm text-gray-400 mb-3">No payments recorded yet.</div>
-            <div v-else class="space-y-1.5 mb-4">
-              <div
-                v-for="p in payments"
-                :key="p.id"
-                class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
-              >
-                <span class="text-gray-600 dark:text-gray-300">
-                  {{ formatDate(p.paymentDate) }} · {{ formatEnum(p.type) }} · {{ formatEnum(p.method) }}
-                  <span v-if="p.referenceNumber" class="text-gray-400">({{ p.referenceNumber }})</span>
-                </span>
-                <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(p.amount) }}</span>
-              </div>
+        <div v-if="planLoading" class="text-sm text-gray-400">Loading…</div>
+        <template v-else>
+          <DynamicForm
+            v-if="!paymentPlan"
+            v-model="planForm"
+            :fields="planFields"
+            :loading="planSaving"
+            :error="planError"
+            submit-label="Create plan"
+            @submit="onCreatePlan"
+          />
+          <div v-else class="space-y-3">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+              <div><span class="text-gray-400">Down payment</span><br />{{ formatCurrency(paymentPlan.downPaymentAmount) }}</div>
+              <div><span class="text-gray-400">Installments</span><br />{{ paymentPlan.installmentCount }}</div>
+              <div><span class="text-gray-400">Frequency</span><br />{{ formatEnum(paymentPlan.installmentFrequency) }}</div>
+              <div><span class="text-gray-400">First due</span><br />{{ formatDate(paymentPlan.firstInstallmentDate) }}</div>
             </div>
-            <DynamicForm
-              v-if="isAdmin && manageTarget?.status === 'ACTIVE'"
-              v-model="downPaymentForm"
-              :fields="downPaymentFields"
-              :loading="downPaymentSaving"
-              :error="downPaymentError"
-              submit-label="Record down payment"
-              @submit="onRecordDownPayment"
-            />
-          </div>
 
-          <!-- Documents -->
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Documents
-            </h3>
-            <div v-if="documentsLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="documents.length === 0" class="text-sm text-gray-400 mb-3">No documents uploaded yet.</div>
-            <div v-else class="space-y-1.5 mb-3">
+            <UButton
+              v-if="!paymentPlan.scheduleGenerated"
+              size="sm"
+              icon="i-lucide-calendar-plus"
+              :loading="generatingSchedule"
+              @click="onGenerateSchedule"
+            >
+              Generate schedule
+            </UButton>
+
+            <div v-else class="space-y-1.5">
               <div
-                v-for="d in documents"
-                :key="d.id"
+                v-for="inst in schedule"
+                :key="inst.id"
                 class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
               >
                 <div>
-                  <button class="text-primary-500 hover:underline text-left" @click="onDownloadDocument(d)">{{ d.fileName }}</button>
-                  <span v-if="d.description" class="text-gray-400"> — {{ d.description }}</span>
-                  <div class="text-xs text-gray-400">{{ formatDateTime(d.createdAt) }} · {{ d.uploadedBy ?? '—' }}</div>
+                  <span class="font-medium text-gray-900 dark:text-white">#{{ inst.installmentNumber }}</span>
+                  <span class="text-gray-400"> · due {{ formatDate(inst.dueDate) }}</span>
+                  <StatusBadge :status="inst.status" class="ml-2" />
+                  <span v-if="inst.overdue" class="text-error-500 ml-1">overdue</span>
                 </div>
-                <UButton
-                  v-if="isAdmin"
-                  size="xs"
-                  color="error"
-                  variant="ghost"
-                  icon="i-lucide-trash-2"
-                  @click="onDeleteDocument(d)"
-                />
-              </div>
-            </div>
-            <FileUploadField v-if="isAdmin" :upload="uploadDocumentForTarget" @uploaded="onDocumentUploaded" />
-          </div>
-
-          <!-- Handover -->
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Handover
-            </h3>
-            <div v-if="handoverLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="handover" class="text-sm space-y-1">
-              <p><span class="text-gray-400">Date:</span> {{ formatDate(handover.handoverDate) }}</p>
-              <p><span class="text-gray-400">Handed over by:</span> {{ handover.handedOverBy }}</p>
-              <p><span class="text-gray-400">Condition:</span> {{ formatEnum(handover.condition) }}</p>
-              <p v-if="handover.notes" class="text-gray-600 dark:text-gray-300">{{ handover.notes }}</p>
-            </div>
-            <DynamicForm
-              v-else-if="isAdmin"
-              v-model="handoverForm"
-              :fields="handoverFields"
-              :loading="handoverSaving"
-              :error="handoverError"
-              submit-label="Record handover"
-              @submit="onCreateHandover"
-            />
-            <p v-else class="text-sm text-gray-400">No handover recorded yet.</p>
-          </div>
-
-          <!-- Refund -->
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Refund
-            </h3>
-            <div v-if="refundLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="refund" class="text-sm space-y-1">
-              <p><span class="text-gray-400">Total paid:</span> {{ formatCurrency(refund.totalPaid) }}</p>
-              <p><span class="text-gray-400">Deductions:</span> {{ formatCurrency(refund.deductions) }}</p>
-              <p><span class="text-gray-400">Refund amount:</span> {{ formatCurrency(refund.refundAmount) }}</p>
-              <p><span class="text-gray-400">Status:</span> <StatusBadge :status="refund.status" /></p>
-              <UButton
-                v-if="isAdmin && refund.status === 'PENDING'"
-                size="sm"
-                color="success"
-                class="mt-2"
-                :loading="refundProcessing"
-                @click="onProcessRefund"
-              >
-                Process refund
-              </UButton>
-            </div>
-            <DynamicForm
-              v-else-if="isAdmin"
-              v-model="refundForm"
-              :fields="refundFields"
-              :loading="refundSaving"
-              :error="refundError"
-              submit-label="Calculate refund"
-              @submit="onCreateRefund"
-            />
-            <p v-else class="text-sm text-gray-400">No refund recorded yet.</p>
-          </div>
-
-          <!-- Ownership transfer -->
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              Ownership transfer
-            </h3>
-            <div v-if="transferLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="transfer" class="text-sm space-y-1">
-              <p><span class="text-gray-400">Date:</span> {{ formatDate(transfer.transferDate) }}</p>
-              <p><span class="text-gray-400">Registered by:</span> {{ transfer.registeredBy }}</p>
-              <p v-if="transfer.documentReference"><span class="text-gray-400">Document reference:</span> {{ transfer.documentReference }}</p>
-              <p v-if="transfer.notes" class="text-gray-600 dark:text-gray-300">{{ transfer.notes }}</p>
-            </div>
-            <DynamicForm
-              v-else-if="isAdmin"
-              v-model="transferForm"
-              :fields="transferFields"
-              :loading="transferSaving"
-              :error="transferError"
-              submit-label="Record transfer"
-              @submit="onCreateTransfer"
-            />
-            <p v-else class="text-sm text-gray-400">No ownership transfer recorded yet.</p>
-          </div>
-
-          <!-- History -->
-          <div class="border-t border-gray-200 dark:border-gray-800 pt-6">
-            <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              History
-            </h3>
-            <div v-if="historyLoading" class="text-sm text-gray-400">Loading…</div>
-            <div v-else-if="historyEntries.length === 0" class="text-sm text-gray-400">No history recorded yet.</div>
-            <div v-else class="space-y-3">
-              <div v-for="h in historyEntries" :key="h.id" class="border-b border-gray-100 dark:border-gray-800 pb-2">
-                <div class="flex items-center justify-between text-sm">
-                  <span class="font-medium text-gray-900 dark:text-white">{{ formatEnum(h.action) }}</span>
-                  <span class="text-gray-400">{{ formatDateTime(h.createdAt) }}</span>
+                <div class="flex items-center gap-2">
+                  <span class="text-gray-600 dark:text-gray-300">
+                    {{ formatCurrency(inst.amountPaid) }} / {{ formatCurrency(inst.amount) }}
+                  </span>
+                  <UButton
+                    v-if="isAdmin && inst.status !== 'PAID'"
+                    size="xs"
+                    color="success"
+                    variant="soft"
+                    icon="i-lucide-plus"
+                    @click="openRecordPaymentWith(inst)"
+                  >
+                    Pay
+                  </UButton>
                 </div>
-                <p v-if="h.description" class="text-sm text-gray-600 dark:text-gray-300">{{ h.description }}</p>
-                <p v-if="h.performedBy" class="text-xs text-gray-400">by {{ h.performedBy }}</p>
               </div>
+              <div v-if="schedule.length === 0" class="text-sm text-gray-400">No installments generated yet.</div>
             </div>
+          </div>
+        </template>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="showPayments"
+      :title="`Payments · ${paymentsTarget?.buyerName ?? ''} — Unit ${paymentsTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="paymentsLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="payments.length === 0" class="text-sm text-gray-400 mb-3">No payments recorded yet.</div>
+        <div v-else class="space-y-1.5 mb-4">
+          <div
+            v-for="p in payments"
+            :key="p.id"
+            class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
+          >
+            <span class="text-gray-600 dark:text-gray-300">
+              {{ formatDate(p.paymentDate) }} · {{ formatEnum(p.type) }} · {{ formatEnum(p.method) }}
+              <span v-if="p.referenceNumber" class="text-gray-400">({{ p.referenceNumber }})</span>
+            </span>
+            <span class="font-medium text-gray-900 dark:text-white">{{ formatCurrency(p.amount) }}</span>
+          </div>
+        </div>
+        <DynamicForm
+          v-if="isAdmin && paymentsTarget?.status === 'ACTIVE'"
+          v-model="downPaymentForm"
+          :fields="downPaymentFields"
+          :loading="downPaymentSaving"
+          :error="downPaymentError"
+          submit-label="Record down payment"
+          @submit="onRecordDownPayment"
+        />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="showDocuments"
+      :title="`Documents · ${documentsTarget?.buyerName ?? ''} — Unit ${documentsTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="documentsLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="documents.length === 0" class="text-sm text-gray-400 mb-3">No documents uploaded yet.</div>
+        <div v-else class="space-y-1.5 mb-3">
+          <div
+            v-for="d in documents"
+            :key="d.id"
+            class="flex items-center justify-between text-sm border-b border-gray-100 dark:border-gray-800 pb-1.5"
+          >
+            <div>
+              <button class="text-primary-500 hover:underline text-left" @click="onDownloadDocument(d)">{{ d.fileName }}</button>
+              <span v-if="d.description" class="text-gray-400"> — {{ d.description }}</span>
+              <div class="text-xs text-gray-400">{{ formatDateTime(d.createdAt) }} · {{ d.uploadedBy ?? '—' }}</div>
+            </div>
+            <UButton
+              v-if="isAdmin"
+              size="xs"
+              color="error"
+              variant="ghost"
+              icon="i-lucide-trash-2"
+              @click="onDeleteDocument(d)"
+            />
+          </div>
+        </div>
+        <FileUploadField v-if="isAdmin" :upload="uploadDocumentForTarget" @uploaded="onDocumentUploaded" />
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="showHandover"
+      :title="`Handover · ${handoverTarget?.buyerName ?? ''} — Unit ${handoverTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="handoverLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="handover" class="text-sm space-y-1">
+          <p><span class="text-gray-400">Date:</span> {{ formatDate(handover.handoverDate) }}</p>
+          <p><span class="text-gray-400">Handed over by:</span> {{ handover.handedOverBy }}</p>
+          <p><span class="text-gray-400">Condition:</span> {{ formatEnum(handover.condition) }}</p>
+          <p v-if="handover.notes" class="text-gray-600 dark:text-gray-300">{{ handover.notes }}</p>
+        </div>
+        <DynamicForm
+          v-else-if="isAdmin"
+          v-model="handoverForm"
+          :fields="handoverFields"
+          :loading="handoverSaving"
+          :error="handoverError"
+          submit-label="Record handover"
+          @submit="onCreateHandover"
+        />
+        <p v-else class="text-sm text-gray-400">No handover recorded yet.</p>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="showRefund"
+      :title="`Refund · ${refundTarget?.buyerName ?? ''} — Unit ${refundTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="refundLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="refund" class="text-sm space-y-1">
+          <p><span class="text-gray-400">Total paid:</span> {{ formatCurrency(refund.totalPaid) }}</p>
+          <p><span class="text-gray-400">Deductions:</span> {{ formatCurrency(refund.deductions) }}</p>
+          <p><span class="text-gray-400">Refund amount:</span> {{ formatCurrency(refund.refundAmount) }}</p>
+          <p><span class="text-gray-400">Status:</span> <StatusBadge :status="refund.status" /></p>
+          <UButton
+            v-if="isAdmin && refund.status === 'PENDING'"
+            size="sm"
+            color="success"
+            class="mt-2"
+            :loading="refundProcessing"
+            @click="onProcessRefund"
+          >
+            Process refund
+          </UButton>
+        </div>
+        <DynamicForm
+          v-else-if="isAdmin"
+          v-model="refundForm"
+          :fields="refundFields"
+          :loading="refundSaving"
+          :error="refundError"
+          submit-label="Calculate refund"
+          @submit="onCreateRefund"
+        />
+        <p v-else class="text-sm text-gray-400">No refund recorded yet.</p>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="showTransfer"
+      :title="`Ownership transfer · ${transferTarget?.buyerName ?? ''} — Unit ${transferTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="transferLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="transfer" class="text-sm space-y-1">
+          <p><span class="text-gray-400">Date:</span> {{ formatDate(transfer.transferDate) }}</p>
+          <p><span class="text-gray-400">Registered by:</span> {{ transfer.registeredBy }}</p>
+          <p v-if="transfer.documentReference"><span class="text-gray-400">Document reference:</span> {{ transfer.documentReference }}</p>
+          <p v-if="transfer.notes" class="text-gray-600 dark:text-gray-300">{{ transfer.notes }}</p>
+        </div>
+        <DynamicForm
+          v-else-if="isAdmin"
+          v-model="transferForm"
+          :fields="transferFields"
+          :loading="transferSaving"
+          :error="transferError"
+          submit-label="Record transfer"
+          @submit="onCreateTransfer"
+        />
+        <p v-else class="text-sm text-gray-400">No ownership transfer recorded yet.</p>
+      </template>
+    </UModal>
+
+    <UModal
+      v-model:open="showHistory"
+      :title="`History · ${historyTarget?.buyerName ?? ''} — Unit ${historyTarget?.unitNumber ?? ''}`"
+    >
+      <template #body>
+        <div v-if="historyLoading" class="text-sm text-gray-400">Loading…</div>
+        <div v-else-if="historyEntries.length === 0" class="text-sm text-gray-400">No history recorded yet.</div>
+        <div v-else class="space-y-3">
+          <div v-for="h in historyEntries" :key="h.id" class="border-b border-gray-100 dark:border-gray-800 pb-2">
+            <div class="flex items-center justify-between text-sm">
+              <span class="font-medium text-gray-900 dark:text-white">{{ formatEnum(h.action) }}</span>
+              <span class="text-gray-400">{{ formatDateTime(h.createdAt) }}</span>
+            </div>
+            <p v-if="h.description" class="text-sm text-gray-600 dark:text-gray-300">{{ h.description }}</p>
+            <p v-if="h.performedBy" class="text-xs text-gray-400">by {{ h.performedBy }}</p>
           </div>
         </div>
       </template>
@@ -440,7 +393,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ColumnDef, FieldDef } from '#shared/types'
+import type { ColumnDef, FieldDef, RowAction } from '#shared/types'
 import type { SaleAgreement, SaleAgreementStatus, SaleHistoryEntry } from '~/composables/useSaleAgreements'
 import type { SalePayment } from '~/composables/useSaleReservations'
 import type { PaymentPlan, Installment } from '~/composables/usePaymentPlans'
@@ -754,12 +707,18 @@ async function onCancelSubmit(values: Record<string, any>) {
   }
 }
 
-// ── Manage modal ───────────────────────────────────────────────────────
-const {
-  open: showManage,
-  target: manageTarget,
-  openWith: openManageWith
-} = useTargetModal<SaleAgreement>()
+// ── Payment plan, Payments, Documents, Handover, Refund, Ownership
+// transfer, and History each get their own modal/target (rather than one
+// general-purpose "Manage" catch-all) — distinct concerns, each fetching
+// only its own data on open instead of one big Promise.all firing all seven
+// fetches whenever any one of them was needed.
+const { open: showPlan, target: planTarget, openWith: openPlanWith } = useTargetModal<SaleAgreement>()
+const { open: showPayments, target: paymentsTarget, openWith: openPaymentsWith } = useTargetModal<SaleAgreement>()
+const { open: showDocuments, target: documentsTarget, openWith: openDocumentsWith } = useTargetModal<SaleAgreement>()
+const { open: showHandover, target: handoverTarget, openWith: openHandoverWith } = useTargetModal<SaleAgreement>()
+const { open: showRefund, target: refundTarget, openWith: openRefundWith } = useTargetModal<SaleAgreement>()
+const { open: showTransfer, target: transferTarget, openWith: openTransferWith } = useTargetModal<SaleAgreement>()
+const { open: showHistory, target: historyTarget, openWith: openHistoryWith } = useTargetModal<SaleAgreement>()
 
 // Payment plan + schedule
 const paymentPlan = ref<PaymentPlan | null>(null)
@@ -777,11 +736,11 @@ const planFields: FieldDef[] = [
 const generatingSchedule = ref(false)
 
 async function onCreatePlan(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!planTarget.value) return
   planSaving.value = true
   planError.value = ''
   try {
-    paymentPlan.value = await createPlan(manageTarget.value.id, {
+    paymentPlan.value = await createPlan(planTarget.value.id, {
       downPaymentAmount: values.downPaymentAmount,
       installmentCount: values.installmentCount,
       installmentFrequency: values.installmentFrequency,
@@ -795,10 +754,10 @@ async function onCreatePlan(values: Record<string, any>) {
   }
 }
 async function onGenerateSchedule() {
-  if (!manageTarget.value) return
+  if (!planTarget.value) return
   generatingSchedule.value = true
   try {
-    schedule.value = await generateSchedule(manageTarget.value.id)
+    schedule.value = await generateSchedule(planTarget.value.id)
     if (paymentPlan.value) paymentPlan.value.scheduleGenerated = true
     toast.add({ title: 'Installment schedule generated', color: 'success' })
   } catch (err) {
@@ -829,7 +788,7 @@ function openRecordPaymentWith(inst: Installment) {
   recordPaymentForm.value = { amount: inst.balanceDue, paymentDate: new Date().toISOString().slice(0, 10) }
 }
 async function onRecordPaymentSubmit(values: Record<string, any>) {
-  if (!recordPaymentTarget.value || !manageTarget.value) return
+  if (!recordPaymentTarget.value || !planTarget.value) return
   recordPaymentLoading.value = true
   recordPaymentError.value = ''
   try {
@@ -842,8 +801,13 @@ async function onRecordPaymentSubmit(values: Record<string, any>) {
     })
     showRecordPayment.value = false
     toast.add({ title: 'Installment payment recorded', color: 'success' })
-    schedule.value = await getSchedule(manageTarget.value.id)
-    payments.value = await listPayments(manageTarget.value.id)
+    // "Pay" only appears from inside the Payment plan modal, so planTarget is
+    // the one target guaranteed set here. The (separate) Payments ledger is
+    // refreshed too — same agreement, and an installment payment shows up
+    // there as well — even if that modal isn't currently open, so it's not
+    // stale if reopened without a full remount.
+    schedule.value = await getSchedule(planTarget.value.id)
+    payments.value = await listPayments(planTarget.value.id)
   } catch (err) {
     recordPaymentError.value = apiErrorMessage(err)
   } finally {
@@ -865,18 +829,18 @@ const downPaymentFields: FieldDef[] = [
   { name: 'notes', type: 'textarea', wrapper: 'full' }
 ]
 async function onRecordDownPayment(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!paymentsTarget.value) return
   downPaymentSaving.value = true
   downPaymentError.value = ''
   try {
-    await recordDownPayment(manageTarget.value.id, {
+    await recordDownPayment(paymentsTarget.value.id, {
       amount: values.amount,
       paymentDate: values.paymentDate,
       method: values.method,
       referenceNumber: values.referenceNumber || undefined,
       notes: values.notes || undefined
     })
-    payments.value = await listPayments(manageTarget.value.id)
+    payments.value = await listPayments(paymentsTarget.value.id)
     downPaymentForm.value = { paymentDate: new Date().toISOString().slice(0, 10) }
     toast.add({ title: 'Down payment recorded', color: 'success' })
   } catch (err) {
@@ -891,27 +855,27 @@ const documents = ref<SaleAgreementDocument[]>([])
 const documentsLoading = ref(false)
 
 function uploadDocumentForTarget(file: File, description?: string) {
-  return uploadDoc(manageTarget.value!.id, file, description)
+  return uploadDoc(documentsTarget.value!.id, file, description)
 }
 async function onDocumentUploaded() {
-  if (!manageTarget.value) return
-  documents.value = await listDocs(manageTarget.value.id)
+  if (!documentsTarget.value) return
+  documents.value = await listDocs(documentsTarget.value.id)
   toast.add({ title: 'Document uploaded', color: 'success' })
 }
 async function onDeleteDocument(doc: SaleAgreementDocument) {
-  if (!manageTarget.value) return
+  if (!documentsTarget.value) return
   try {
-    await removeDoc(manageTarget.value.id, doc.id)
-    documents.value = await listDocs(manageTarget.value.id)
+    await removeDoc(documentsTarget.value.id, doc.id)
+    documents.value = await listDocs(documentsTarget.value.id)
     toast.add({ title: 'Document deleted', color: 'success' })
   } catch (err) {
     toast.add({ title: 'Could not delete document', description: apiErrorMessage(err), color: 'error' })
   }
 }
 async function onDownloadDocument(doc: SaleAgreementDocument) {
-  if (!manageTarget.value) return
+  if (!documentsTarget.value) return
   try {
-    await downloadDoc(manageTarget.value.id, doc.id, doc.fileName)
+    await downloadDoc(documentsTarget.value.id, doc.id, doc.fileName)
   } catch (err) {
     toast.add({ title: 'Could not download document', description: apiErrorMessage(err), color: 'error' })
   }
@@ -930,11 +894,11 @@ const handoverFields: FieldDef[] = [
   { name: 'notes', type: 'textarea', wrapper: 'full' }
 ]
 async function onCreateHandover(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!handoverTarget.value) return
   handoverSaving.value = true
   handoverError.value = ''
   try {
-    handover.value = await createHandover(manageTarget.value.id, {
+    handover.value = await createHandover(handoverTarget.value.id, {
       handoverDate: values.handoverDate,
       handedOverBy: values.handedOverBy,
       condition: values.condition,
@@ -960,11 +924,11 @@ const refundFields: FieldDef[] = [
   { name: 'notes', type: 'textarea', wrapper: 'full' }
 ]
 async function onCreateRefund(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!refundTarget.value) return
   refundSaving.value = true
   refundError.value = ''
   try {
-    refund.value = await createRefund(manageTarget.value.id, { deductions: values.deductions || undefined, notes: values.notes || undefined })
+    refund.value = await createRefund(refundTarget.value.id, { deductions: values.deductions || undefined, notes: values.notes || undefined })
     toast.add({ title: 'Refund calculated', color: 'success' })
   } catch (err) {
     refundError.value = apiErrorMessage(err)
@@ -973,10 +937,10 @@ async function onCreateRefund(values: Record<string, any>) {
   }
 }
 async function onProcessRefund() {
-  if (!manageTarget.value) return
+  if (!refundTarget.value) return
   refundProcessing.value = true
   try {
-    refund.value = await processRefund(manageTarget.value.id)
+    refund.value = await processRefund(refundTarget.value.id)
     toast.add({ title: 'Refund processed', color: 'success' })
   } catch (err) {
     toast.add({ title: 'Could not process refund', description: apiErrorMessage(err), color: 'error' })
@@ -998,11 +962,11 @@ const transferFields: FieldDef[] = [
   { name: 'notes', type: 'textarea', wrapper: 'full' }
 ]
 async function onCreateTransfer(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!transferTarget.value) return
   transferSaving.value = true
   transferError.value = ''
   try {
-    transfer.value = await createTransfer(manageTarget.value.id, {
+    transfer.value = await createTransfer(transferTarget.value.id, {
       transferDate: values.transferDate,
       registeredBy: values.registeredBy,
       documentReference: values.documentReference || undefined,
@@ -1024,104 +988,110 @@ function is404(err: unknown) {
   return (err as { response?: { status?: number } })?.response?.status === 404
 }
 
-watch(showManage, async (value) => {
-  if (!value || !manageTarget.value) return
-  const id = manageTarget.value.id
-
+watch(showPlan, async (value) => {
+  if (!value || !planTarget.value) return
+  const id = planTarget.value.id
   paymentPlan.value = null
   schedule.value = []
   planForm.value = {}
   planError.value = ''
   planLoading.value = true
-  handover.value = null
-  handoverForm.value = {}
-  handoverError.value = ''
-  handoverLoading.value = true
-  refund.value = null
-  refundForm.value = {}
-  refundError.value = ''
-  refundLoading.value = true
-  transfer.value = null
-  transferForm.value = {}
-  transferError.value = ''
-  transferLoading.value = true
-  documents.value = []
-  documentsLoading.value = true
+  try {
+    paymentPlan.value = await getPlan(id)
+    if (paymentPlan.value.scheduleGenerated) {
+      schedule.value = await getSchedule(id)
+    }
+  } catch (err) {
+    if (!is404(err)) planError.value = apiErrorMessage(err)
+  } finally {
+    planLoading.value = false
+  }
+})
+
+watch(showPayments, async (value) => {
+  if (!value || !paymentsTarget.value) return
   payments.value = []
   paymentsLoading.value = true
   downPaymentForm.value = { paymentDate: new Date().toISOString().slice(0, 10) }
   downPaymentError.value = ''
+  try {
+    payments.value = await listPayments(paymentsTarget.value.id)
+  } catch (err) {
+    toast.add({ title: 'Could not load payments', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    paymentsLoading.value = false
+  }
+})
+
+watch(showDocuments, async (value) => {
+  if (!value || !documentsTarget.value) return
+  documents.value = []
+  documentsLoading.value = true
+  try {
+    documents.value = await listDocs(documentsTarget.value.id)
+  } catch (err) {
+    toast.add({ title: 'Could not load documents', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    documentsLoading.value = false
+  }
+})
+
+watch(showHandover, async (value) => {
+  if (!value || !handoverTarget.value) return
+  handover.value = null
+  handoverForm.value = {}
+  handoverError.value = ''
+  handoverLoading.value = true
+  try {
+    handover.value = await getHandover(handoverTarget.value.id)
+  } catch (err) {
+    if (!is404(err)) handoverError.value = apiErrorMessage(err)
+  } finally {
+    handoverLoading.value = false
+  }
+})
+
+watch(showRefund, async (value) => {
+  if (!value || !refundTarget.value) return
+  refund.value = null
+  refundForm.value = {}
+  refundError.value = ''
+  refundLoading.value = true
+  try {
+    refund.value = await getRefund(refundTarget.value.id)
+  } catch (err) {
+    if (!is404(err)) refundError.value = apiErrorMessage(err)
+  } finally {
+    refundLoading.value = false
+  }
+})
+
+watch(showTransfer, async (value) => {
+  if (!value || !transferTarget.value) return
+  transfer.value = null
+  transferForm.value = {}
+  transferError.value = ''
+  transferLoading.value = true
+  try {
+    transfer.value = await getTransfer(transferTarget.value.id)
+  } catch (err) {
+    if (!is404(err)) transferError.value = apiErrorMessage(err)
+  } finally {
+    transferLoading.value = false
+  }
+})
+
+watch(showHistory, async (value) => {
+  if (!value || !historyTarget.value) return
   historyEntries.value = []
   historyLoading.value = true
-
-  await Promise.all([
-    (async () => {
-      try {
-        paymentPlan.value = await getPlan(id)
-        if (paymentPlan.value.scheduleGenerated) {
-          schedule.value = await getSchedule(id)
-        }
-      } catch (err) {
-        if (!is404(err)) planError.value = apiErrorMessage(err)
-      } finally {
-        planLoading.value = false
-      }
-    })(),
-    (async () => {
-      try {
-        payments.value = await listPayments(id)
-      } catch (err) {
-        toast.add({ title: 'Could not load payments', description: apiErrorMessage(err), color: 'error' })
-      } finally {
-        paymentsLoading.value = false
-      }
-    })(),
-    (async () => {
-      try {
-        documents.value = await listDocs(id)
-      } catch (err) {
-        toast.add({ title: 'Could not load documents', description: apiErrorMessage(err), color: 'error' })
-      } finally {
-        documentsLoading.value = false
-      }
-    })(),
-    (async () => {
-      try {
-        handover.value = await getHandover(id)
-      } catch (err) {
-        if (!is404(err)) handoverError.value = apiErrorMessage(err)
-      } finally {
-        handoverLoading.value = false
-      }
-    })(),
-    (async () => {
-      try {
-        refund.value = await getRefund(id)
-      } catch (err) {
-        if (!is404(err)) refundError.value = apiErrorMessage(err)
-      } finally {
-        refundLoading.value = false
-      }
-    })(),
-    (async () => {
-      try {
-        transfer.value = await getTransfer(id)
-      } catch (err) {
-        if (!is404(err)) transferError.value = apiErrorMessage(err)
-      } finally {
-        transferLoading.value = false
-      }
-    })(),
-    (async () => {
-      try {
-        historyEntries.value = await history(id)
-      } catch (err) {
-        toast.add({ title: 'Could not load history', description: apiErrorMessage(err), color: 'error' })
-      } finally {
-        historyLoading.value = false
-      }
-    })()
-  ])
+  try {
+    historyEntries.value = await history(historyTarget.value.id)
+  } catch (err) {
+    toast.add({ title: 'Could not load history', description: apiErrorMessage(err), color: 'error' })
+  } finally {
+    historyLoading.value = false
+  }
 })
 
 watch(sort, load)
@@ -1135,5 +1105,28 @@ function clearFilters() {
   filter.buyerId = undefined
   filter.status = undefined
   load()
+}
+
+function agreementActions(row: SaleAgreement): RowAction[] {
+  const actions: RowAction[] = [
+    { label: 'Payment plan', icon: 'i-lucide-calendar-clock', onClick: () => openPlanWith(row) },
+    { label: 'Payments', icon: 'i-lucide-banknote', onClick: () => openPaymentsWith(row) }
+  ]
+  if (isAdmin.value && row.status === 'ACTIVE') {
+    actions.push({ label: 'Discount', icon: 'i-lucide-percent', onClick: () => openDiscountWith(row) })
+    actions.push({ label: 'Agent', icon: 'i-lucide-user-round', onClick: () => openAgentWith(row) })
+  }
+  if (isAdmin.value && row.agentId && !row.commissionPaid) {
+    actions.push({ label: 'Mark commission paid', icon: 'i-lucide-check', color: 'success', onClick: () => openCommissionWith(row) })
+  }
+  if (isAdmin.value && row.status === 'ACTIVE') {
+    actions.push({ label: 'Cancel', icon: 'i-lucide-ban', color: 'error', onClick: () => openCancelWith(row) })
+  }
+  actions.push({ label: 'Documents', icon: 'i-lucide-folder', onClick: () => openDocumentsWith(row) })
+  actions.push({ label: 'Handover', icon: 'i-lucide-key', onClick: () => openHandoverWith(row) })
+  actions.push({ label: 'Refund', icon: 'i-lucide-undo-2', onClick: () => openRefundWith(row) })
+  actions.push({ label: 'Ownership transfer', icon: 'i-lucide-file-check', onClick: () => openTransferWith(row) })
+  actions.push({ label: 'History', icon: 'i-lucide-history', onClick: () => openHistoryWith(row) })
+  return actions
 }
 </script>

@@ -8,14 +8,12 @@
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
         <UInput
-          v-model="filter.fullName"
+          v-model="search"
           placeholder="Search name"
           icon="i-lucide-search"
           class="w-56"
-          @keyup.enter="load"
         />
-        <USelect v-model="filter.active" :items="activeFilterOptions" placeholder="Status" class="w-40" />
-        <UButton size="sm" color="neutral" variant="soft" icon="i-lucide-search" @click="load">Search</UButton>
+        <USelect v-model="filter.active" :items="activeFilterOptions" placeholder="Status" class="w-32" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -152,7 +150,7 @@ const rows = ref<SalesAgent[]>([])
 const loading = ref(false)
 const error = ref('')
 
-const filter = reactive<{ fullName: string; active: boolean | undefined }>({ fullName: '', active: undefined })
+const filter = reactive<{ active: boolean | undefined }>({ active: undefined })
 const activeFilterOptions = [
   { label: 'All statuses', value: undefined },
   { label: 'Active', value: true },
@@ -164,7 +162,10 @@ const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   direction: 'desc'
 })
 
-const { page, pageSize, total, rows: pagedRows, truncated } = useClientTable(rows, { pageSize: 10 })
+const { page, pageSize, total, rows: pagedRows, truncated, search } = useClientTable(rows, {
+  pageSize: 10,
+  searchFields: ['fullName']
+})
 
 const columns: ColumnDef<SalesAgent>[] = [
   { key: 'fullName', label: 'Name', sortable: true },
@@ -180,7 +181,6 @@ async function load() {
   error.value = ''
   try {
     const res = await list({
-      fullName: filter.fullName || undefined,
       active: filter.active,
       sortBy: sort.value?.column,
       sortOrder: sort.value?.direction,
@@ -276,10 +276,10 @@ onMounted(load)
 watch(sort, load)
 watch(() => filter.active, load)
 
-const hasActiveFilter = computed(() => filter.fullName !== '' || filter.active !== undefined)
+const hasActiveFilter = computed(() => search.value !== '' || filter.active !== undefined)
 
 function clearFilters() {
-  filter.fullName = ''
+  search.value = ''
   filter.active = undefined
   load()
 }

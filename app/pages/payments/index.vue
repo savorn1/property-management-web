@@ -22,8 +22,8 @@
           class="w-40"
           @keyup.enter="load"
         />
-        <USelect v-model="filter.type" :items="typeFilterOptions" placeholder="Type" class="w-44" />
-        <USelect v-model="filter.method" :items="methodFilterOptions" placeholder="Method" class="w-48" />
+        <USelect v-model="filter.type" :items="typeFilterOptions" placeholder="Type" class="w-36" />
+        <USelect v-model="filter.method" :items="methodFilterOptions" placeholder="Method" class="w-40" />
         <UButton size="sm" color="neutral" variant="soft" icon="i-lucide-search" @click="load">Search</UButton>
         <UButton
           v-if="hasActiveFilter"

@@ -7,9 +7,9 @@
 
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
-        <USelect v-model="filter.saleListingId" :items="listingFilterOptions" placeholder="Listing" class="w-56" />
-        <USelect v-model="filter.buyerId" :items="buyerFilterOptions" placeholder="Buyer" class="w-56" />
-        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-44" />
+        <USelect v-model="filter.saleListingId" :items="listingFilterOptions" placeholder="Listing" class="w-48" />
+        <USelect v-model="filter.buyerId" :items="buyerFilterOptions" placeholder="Buyer" class="w-48" />
+        <USelect v-model="filter.status" :items="statusFilterOptions" placeholder="Status" class="w-36" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -40,31 +40,7 @@
         @refresh="load"
       >
         <template #actions-data="{ row }">
-          <div class="flex flex-wrap items-center gap-2">
-            <UButton
-              v-if="isAdmin && row.status === 'ACTIVE'"
-              size="xs"
-              color="success"
-              variant="soft"
-              icon="i-lucide-file-signature"
-              @click="createAgreementFrom(row)"
-            >
-              Create agreement
-            </UButton>
-            <UButton
-              v-if="isAdmin && row.status === 'ACTIVE'"
-              size="xs"
-              color="error"
-              variant="soft"
-              icon="i-lucide-ban"
-              @click="openCancelWith(row)"
-            >
-              Cancel
-            </UButton>
-            <UButton size="xs" color="neutral" variant="soft" icon="i-lucide-settings-2" @click="openManageWith(row)">
-              Deposits
-            </UButton>
-          </div>
+          <RowActions :actions="reservationActions(row)" />
         </template>
         <template #empty-state>
           <EmptyState
@@ -120,7 +96,10 @@
       </template>
     </UModal>
 
-    <UModal v-model:open="showManage" :title="`Deposit payments · ${manageTarget?.buyerName ?? ''} — Unit ${manageTarget?.unitNumber ?? ''}`">
+    <UModal
+      v-model:open="showDeposits"
+      :title="`Deposit payments · ${depositsTarget?.buyerName ?? ''} — Unit ${depositsTarget?.unitNumber ?? ''}`"
+    >
       <template #body>
         <div v-if="depositsLoading" class="text-sm text-gray-400">Loading…</div>
         <div v-else-if="deposits.length === 0" class="text-sm text-gray-400 mb-3">No deposit payments recorded yet.</div>
@@ -138,7 +117,7 @@
           </div>
         </div>
         <DynamicForm
-          v-if="isAdmin && manageTarget?.status === 'ACTIVE'"
+          v-if="isAdmin && depositsTarget?.status === 'ACTIVE'"
           v-model="depositForm"
           :fields="depositFields"
           :loading="depositSaving"
@@ -152,7 +131,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ColumnDef, FieldDef } from '#shared/types'
+import type { ColumnDef, FieldDef, RowAction } from '#shared/types'
 import type { SaleReservation, ReservationStatus, SalePayment } from '~/composables/useSaleReservations'
 
 const { list, create, cancel, listDepositPayments, createDepositPayment } = useSaleReservations()
@@ -324,11 +303,11 @@ function createAgreementFrom(row: SaleReservation) {
   })
 }
 
-// Manage — deposit payments (SalePaymentType.RESERVATION_DEPOSIT)
+// Deposit payments (SalePaymentType.RESERVATION_DEPOSIT)
 const {
-  open: showManage,
-  target: manageTarget,
-  openWith: openManageWith
+  open: showDeposits,
+  target: depositsTarget,
+  openWith: openDepositsWith
 } = useTargetModal<SaleReservation>()
 const deposits = ref<SalePayment[]>([])
 const depositsLoading = ref(false)
@@ -342,13 +321,13 @@ const depositFields: FieldDef[] = [
   { name: 'referenceNumber', label: 'Reference number' },
   { name: 'notes', type: 'textarea', wrapper: 'full' }
 ]
-watch(showManage, async (value) => {
-  if (!value || !manageTarget.value) return
+watch(showDeposits, async (value) => {
+  if (!value || !depositsTarget.value) return
   depositForm.value = { paymentDate: new Date().toISOString().slice(0, 10) }
   depositError.value = ''
   depositsLoading.value = true
   try {
-    deposits.value = await listDepositPayments(manageTarget.value.id)
+    deposits.value = await listDepositPayments(depositsTarget.value.id)
   } catch (err) {
     depositError.value = apiErrorMessage(err)
   } finally {
@@ -356,18 +335,18 @@ watch(showManage, async (value) => {
   }
 })
 async function onAddDeposit(values: Record<string, any>) {
-  if (!manageTarget.value) return
+  if (!depositsTarget.value) return
   depositSaving.value = true
   depositError.value = ''
   try {
-    await createDepositPayment(manageTarget.value.id, {
+    await createDepositPayment(depositsTarget.value.id, {
       amount: values.amount,
       paymentDate: values.paymentDate,
       method: values.method,
       referenceNumber: values.referenceNumber || undefined,
       notes: values.notes || undefined
     })
-    deposits.value = await listDepositPayments(manageTarget.value.id)
+    deposits.value = await listDepositPayments(depositsTarget.value.id)
     depositForm.value = { paymentDate: new Date().toISOString().slice(0, 10) }
     toast.add({ title: 'Deposit payment recorded', color: 'success' })
   } catch (err) {
@@ -392,5 +371,15 @@ function clearFilters() {
   filter.buyerId = undefined
   filter.status = undefined
   load()
+}
+
+function reservationActions(row: SaleReservation): RowAction[] {
+  const actions: RowAction[] = []
+  if (isAdmin.value && row.status === 'ACTIVE') {
+    actions.push({ label: 'Create agreement', icon: 'i-lucide-file-signature', color: 'success', onClick: () => createAgreementFrom(row) })
+    actions.push({ label: 'Cancel', icon: 'i-lucide-ban', color: 'error', onClick: () => openCancelWith(row) })
+  }
+  actions.push({ label: 'Deposits', icon: 'i-lucide-piggy-bank', onClick: () => openDepositsWith(row) })
+  return actions
 }
 </script>
