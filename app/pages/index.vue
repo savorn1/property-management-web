@@ -1,6 +1,24 @@
 <template>
   <div>
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-6">Dashboard</h1>
+    <div class="flex items-baseline justify-between mb-6 gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Portfolio overview, updated live from every workspace.</p>
+      </div>
+      <div class="flex items-center gap-3 shrink-0">
+        <span v-if="lastUpdatedLabel" class="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">Updated {{ lastUpdatedLabel }}</span>
+        <UButton
+          icon="i-lucide-refresh-cw"
+          color="neutral"
+          variant="subtle"
+          size="sm"
+          :loading="loading"
+          @click="load"
+        >
+          Refresh
+        </UButton>
+      </div>
+    </div>
 
     <UAlert
       v-if="sectionErrors.length > 0"
@@ -17,75 +35,67 @@
       </template>
     </UAlert>
 
-    <section class="mb-8">
-      <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-        Property overview
-      </h2>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatTile label="Total properties" :value="fmt(propertyReport?.totalProperties)" icon="i-lucide-building" :loading="loading" to="/properties" />
-        <StatTile label="Total buildings" :value="fmt(propertyReport?.totalBuildings)" icon="i-lucide-building-2" :loading="loading" to="/buildings" />
-        <StatTile label="Total floors" :value="fmt(propertyReport?.totalFloors)" icon="i-lucide-layers" :loading="loading" to="/floors" />
-        <StatTile label="Total units" :value="fmt(propertyReport?.totalUnits)" icon="i-lucide-door-open" :loading="loading" to="/units" />
-        <StatTile
-          label="Active properties"
-          :value="fmt(propertyReport?.activePropertyCount)"
-          sublabel="≥ 1 active lease"
-          icon="i-lucide-badge-check"
-          color="success"
-          :loading="loading"
-          to="/properties"
-        />
-      </div>
-    </section>
+    <div class="space-y-10">
+      <section>
+        <DashboardSectionHeader icon="i-lucide-building" label="Property overview" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <StatTile label="Total properties" :value="fmt(propertyReport?.totalProperties)" icon="i-lucide-building" :loading="loading" to="/properties" />
+          <StatTile label="Total buildings" :value="fmt(propertyReport?.totalBuildings)" icon="i-lucide-building-2" :loading="loading" to="/buildings" />
+          <StatTile label="Total floors" :value="fmt(propertyReport?.totalFloors)" icon="i-lucide-layers" :loading="loading" to="/floors" />
+          <StatTile label="Total units" :value="fmt(propertyReport?.totalUnits)" icon="i-lucide-door-open" :loading="loading" to="/units" />
+          <StatTile
+            label="Active properties"
+            :value="fmt(propertyReport?.activePropertyCount)"
+            sublabel="≥ 1 active lease"
+            icon="i-lucide-badge-check"
+            color="success"
+            :loading="loading"
+            to="/properties"
+          />
+        </div>
+      </section>
 
-    <section class="mb-8">
-      <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-        Unit overview
-      </h2>
+      <section>
+        <DashboardSectionHeader icon="i-lucide-door-open" label="Unit overview" />
 
-      <UCard class="mb-4">
-        <div v-if="loading" class="h-2.5 rounded-full bg-gray-100 dark:bg-gray-800 animate-pulse" />
-        <template v-else-if="occupancy && occupancy.totalUnits > 0">
-          <div class="flex h-2.5 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800">
-            <div
-              v-for="segment in unitSegments"
-              :key="segment.key"
-              :style="{ width: `${(segment.value / occupancy.totalUnits) * 100}%` }"
-              :class="segment.barClass"
-              :title="`${segment.label}: ${segment.value} (${((segment.value / occupancy!.totalUnits) * 100).toFixed(1)}%)`"
-              class="h-full border-r-2 border-white dark:border-gray-950 last:border-r-0"
-            />
-          </div>
-          <div class="flex flex-wrap gap-x-5 gap-y-2 mt-4 text-sm">
-            <span v-for="segment in unitSegments" :key="segment.key" class="flex items-center gap-1.5 text-gray-600 dark:text-gray-300">
-              <span class="w-2.5 h-2.5 rounded-full shrink-0" :class="segment.dotClass" />
-              {{ segment.label }}
-              <span class="font-medium text-gray-900 dark:text-white">{{ segment.value }}</span>
-            </span>
-          </div>
-        </template>
-        <EmptyState v-else icon="i-lucide-door-open" title="No units yet" description="Add units to see the occupancy breakdown here." />
-      </UCard>
+        <UCard class="mb-4">
+          <div v-if="loading" class="h-2.5 rounded-full bg-gray-100 dark:bg-gray-800 animate-pulse" />
+          <template v-else-if="occupancy && occupancy.totalUnits > 0">
+            <div class="flex h-2.5 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800">
+              <div
+                v-for="segment in unitSegments"
+                :key="segment.key"
+                :style="{ width: `${(segment.value / occupancy.totalUnits) * 100}%` }"
+                :class="segment.barClass"
+                :title="`${segment.label}: ${segment.value} (${((segment.value / occupancy!.totalUnits) * 100).toFixed(1)}%)`"
+                class="h-full border-r-2 border-white dark:border-gray-950 last:border-r-0"
+              />
+            </div>
+            <div class="flex flex-wrap gap-x-5 gap-y-2 mt-4 text-sm">
+              <span v-for="segment in unitSegments" :key="segment.key" class="flex items-center gap-1.5 text-gray-600 dark:text-gray-300">
+                <span class="w-2.5 h-2.5 rounded-full shrink-0" :class="segment.dotClass" />
+                {{ segment.label }}
+                <span class="font-medium text-gray-900 dark:text-white">{{ segment.value }}</span>
+              </span>
+            </div>
+          </template>
+          <EmptyState v-else icon="i-lucide-door-open" title="No units yet" description="Add units to see the occupancy breakdown here." />
+        </UCard>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <StatTile label="Occupied" :value="fmt(occupancy?.occupiedUnits)" icon="i-lucide-door-closed" color="info" :loading="loading" to="/units?occupancyStatus=OCCUPIED" />
-        <StatTile label="Available" :value="fmt(occupancy?.availableUnits)" icon="i-lucide-check-circle" color="success" :loading="loading" to="/units?occupancyStatus=VACANT" />
-        <StatTile label="Reserved" :value="fmt(occupancy?.reservedUnits)" icon="i-lucide-bookmark" color="warning" :loading="loading" to="/units?occupancyStatus=RESERVED" />
-        <StatTile label="Maintenance" :value="fmt(occupancy?.maintenanceUnits)" icon="i-lucide-wrench" color="warning" :loading="loading" to="/units?occupancyStatus=MAINTENANCE" />
-        <StatTile label="Blocked" :value="fmt(occupancy?.unavailableUnits)" icon="i-lucide-ban" color="neutral" :loading="loading" to="/units" />
-        <StatTile label="Occupancy rate" :value="occupancyRateLabel" icon="i-lucide-percent" color="primary" :loading="loading" />
-      </div>
-    </section>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <StatTile label="Occupied" :value="fmt(occupancy?.occupiedUnits)" icon="i-lucide-door-closed" color="info" :loading="loading" to="/units?occupancyStatus=OCCUPIED" />
+          <StatTile label="Available" :value="fmt(occupancy?.availableUnits)" icon="i-lucide-check-circle" color="success" :loading="loading" to="/units?occupancyStatus=VACANT" />
+          <StatTile label="Reserved" :value="fmt(occupancy?.reservedUnits)" icon="i-lucide-bookmark" color="warning" :loading="loading" to="/units?occupancyStatus=RESERVED" />
+          <StatTile label="Maintenance" :value="fmt(occupancy?.maintenanceUnits)" icon="i-lucide-wrench" color="warning" :loading="loading" to="/units?occupancyStatus=MAINTENANCE" />
+          <StatTile label="Blocked" :value="fmt(occupancy?.unavailableUnits)" icon="i-lucide-ban" color="neutral" :loading="loading" to="/units" />
+          <StatTile label="Occupancy rate" :value="occupancyRateLabel" icon="i-lucide-percent" color="primary" :loading="loading" />
+        </div>
+      </section>
 
-    <section>
-      <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-        Rental overview
-      </h2>
-      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4">
-        <StatTile label="Active tenants" :value="fmt(rentalReport?.activeTenants)" icon="i-lucide-user-round" :loading="loading" to="/tenants?status=ACTIVE" />
-        <StatTile label="Active leases" :value="fmt(rentalReport?.activeLeases)" icon="i-lucide-file-signature" :loading="loading" to="/leases?status=ACTIVE" />
+      <section>
+        <DashboardSectionHeader icon="i-lucide-users" label="Rental overview" />
 
-        <UCard class="sm:col-span-2" :ui="{ body: 'h-full flex flex-col justify-center' }">
+        <UCard class="mb-4" :ui="{ body: loading || (rentalReport?.monthlyRentRoll ?? 0) > 0 ? '' : 'py-2' }">
           <div v-if="loading" class="space-y-2">
             <div class="h-4 w-40 rounded bg-gray-100 dark:bg-gray-800 animate-pulse" />
             <div class="h-2.5 w-full rounded-full bg-gray-100 dark:bg-gray-800 animate-pulse" />
@@ -95,7 +105,7 @@
               <p class="text-sm text-gray-500 dark:text-gray-400">Rent collected this month</p>
               <p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ collectionRateLabel }}</p>
             </div>
-            <div class="h-2.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+            <div class="h-2.5 rounded-full bg-success/15 overflow-hidden">
               <div
                 class="h-full rounded-full bg-success transition-[width]"
                 :style="{ width: `${collectionRatePercent}%` }"
@@ -106,105 +116,106 @@
               <span class="text-gray-400 dark:text-gray-500"> of {{ fmtCurrency(rentalReport?.monthlyRentRoll) }} expected</span>
             </p>
           </template>
-          <EmptyState v-else icon="i-lucide-wallet" title="No active leases" description="Rent collection tracking appears once a lease is active." />
+          <div v-else class="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+            <UIcon name="i-lucide-wallet" class="size-5 shrink-0 text-gray-300 dark:text-gray-600" />
+            <span>No active leases — rent collection tracking appears once a lease is active.</span>
+          </div>
         </UCard>
 
-        <StatTile label="Outstanding rent" :value="fmtCurrency(collections?.outstandingInvoiceAmount)" icon="i-lucide-hourglass" color="warning" :loading="loading" />
-        <StatTile label="Overdue rent" :value="fmtCurrency(collections?.overdueInvoiceAmount)" icon="i-lucide-triangle-alert" color="warning" :loading="loading" />
-        <StatTile
-          label="Expiring within 30 days"
-          :value="fmt(rentalReport?.expiringWithin30Days)"
-          icon="i-lucide-calendar-clock"
-          color="warning"
-          :loading="loading"
-          to="/leases?status=ACTIVE"
-        />
-        <StatTile label="Pending approval" :value="fmt(rentalReport?.pendingApprovalLeases)" icon="i-lucide-clock" color="warning" :loading="loading" to="/leases?status=PENDING_APPROVAL" />
-      </div>
-    </section>
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4">
+          <StatTile label="Active tenants" :value="fmt(rentalReport?.activeTenants)" icon="i-lucide-user-round" :loading="loading" to="/tenants?status=ACTIVE" />
+          <StatTile label="Active leases" :value="fmt(rentalReport?.activeLeases)" icon="i-lucide-file-signature" :loading="loading" to="/leases?status=ACTIVE" />
+          <StatTile label="Outstanding rent" :value="fmtCurrencyCompact(collections?.outstandingInvoiceAmount)" icon="i-lucide-hourglass" color="neutral" :loading="loading" />
+          <StatTile label="Overdue rent" :value="fmtCurrencyCompact(collections?.overdueInvoiceAmount)" icon="i-lucide-triangle-alert" color="error" :loading="loading" />
+          <StatTile
+            label="Expiring within 30 days"
+            :value="fmt(rentalReport?.expiringWithin30Days)"
+            icon="i-lucide-calendar-clock"
+            color="warning"
+            :loading="loading"
+            to="/leases?status=ACTIVE"
+          />
+          <StatTile label="Pending approval" :value="fmt(rentalReport?.pendingApprovalLeases)" icon="i-lucide-clock" color="warning" :loading="loading" to="/leases?status=PENDING_APPROVAL" />
+        </div>
+      </section>
 
-    <section>
-      <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-        Sales overview
-      </h2>
-      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4">
-        <StatTile label="Buyers" :value="fmt(salesPipelineReport?.totalBuyers)" icon="i-lucide-handshake" :loading="loading" to="/buyers" />
-        <StatTile label="Active reservations" :value="fmt(salesPipelineReport?.activeReservations)" icon="i-lucide-bookmark" :loading="loading" to="/sale-reservations?status=ACTIVE" />
-        <StatTile
-          label="Active sale agreements"
-          :value="fmt(salesPipelineReport?.activeAgreements)"
-          :sublabel="fmtCurrency(salesPipelineReport?.activeAgreementsValue)"
-          icon="i-lucide-file-signature"
-          :loading="loading"
-          to="/sale-agreements?status=ACTIVE"
-        />
-        <StatTile label="Sales collected" :sublabel="periodLabel" :value="fmtCurrency(revenue?.salesCollected)" icon="i-lucide-wallet" color="success" :loading="loading" />
-        <StatTile label="Outstanding installments" :value="fmtCurrency(collections?.outstandingInstallmentAmount)" icon="i-lucide-hourglass" color="warning" :loading="loading" />
-        <StatTile label="Overdue installments" :value="fmtCurrency(collections?.overdueInstallmentAmount)" icon="i-lucide-triangle-alert" color="warning" :loading="loading" />
-      </div>
-    </section>
+      <section>
+        <DashboardSectionHeader icon="i-lucide-handshake" label="Sales overview" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-4">
+          <StatTile label="Buyers" :value="fmt(salesPipelineReport?.totalBuyers)" icon="i-lucide-handshake" :loading="loading" to="/buyers" />
+          <StatTile label="Active reservations" :value="fmt(salesPipelineReport?.activeReservations)" icon="i-lucide-bookmark" :loading="loading" to="/sale-reservations?status=ACTIVE" />
+          <StatTile
+            label="Active sale agreements"
+            :value="fmt(salesPipelineReport?.activeAgreements)"
+            :sublabel="fmtCurrencyCompact(salesPipelineReport?.activeAgreementsValue)"
+            icon="i-lucide-file-signature"
+            :loading="loading"
+            to="/sale-agreements?status=ACTIVE"
+          />
+          <StatTile label="Sales collected" :sublabel="periodLabel" :value="fmtCurrencyCompact(revenue?.salesCollected)" icon="i-lucide-wallet" color="success" :loading="loading" />
+          <StatTile label="Outstanding installments" :value="fmtCurrencyCompact(collections?.outstandingInstallmentAmount)" icon="i-lucide-hourglass" color="neutral" :loading="loading" />
+          <StatTile label="Overdue installments" :value="fmtCurrencyCompact(collections?.overdueInstallmentAmount)" icon="i-lucide-triangle-alert" color="error" :loading="loading" />
+        </div>
+      </section>
 
-    <section>
-      <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-        Operations overview
-      </h2>
-      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-        <StatTile label="Open maintenance requests" :value="fmt(maintenanceReport?.openCount)" icon="i-lucide-wrench" color="warning" :loading="loading" to="/maintenance?status=OPEN" />
-        <StatTile
-          label="Maintenance cost"
-          :sublabel="periodLabel"
-          :value="fmtCurrency(maintenanceReport?.totalActualCost)"
-          icon="i-lucide-hammer"
-          color="warning"
-          :loading="loading"
-          to="/maintenance"
-        />
-        <StatTile label="Pending utility bills" :value="fmt(counts.pendingUtilityBills)" icon="i-lucide-zap" color="warning" :loading="loading" to="/utility-bills?status=PENDING" />
-        <StatTile label="Available parking spots" :value="fmt(counts.availableParkingSpots)" icon="i-lucide-square-parking" color="success" :loading="loading" to="/parking-spots?status=AVAILABLE" />
-        <StatTile label="Utility collected" :sublabel="periodLabel" :value="fmtCurrency(revenue?.utilityCollected)" icon="i-lucide-wallet" color="success" :loading="loading" />
-      </div>
-    </section>
+      <section>
+        <DashboardSectionHeader icon="i-lucide-wrench" label="Operations overview" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+          <StatTile label="Open maintenance requests" :value="fmt(maintenanceReport?.openCount)" icon="i-lucide-wrench" color="warning" :loading="loading" to="/maintenance?status=OPEN" />
+          <StatTile
+            label="Maintenance cost"
+            :sublabel="periodLabel"
+            :value="fmtCurrencyCompact(maintenanceReport?.totalActualCost)"
+            icon="i-lucide-hammer"
+            color="neutral"
+            :loading="loading"
+            to="/maintenance"
+          />
+          <StatTile label="Pending utility bills" :value="fmt(counts.pendingUtilityBills)" icon="i-lucide-zap" color="warning" :loading="loading" to="/utility-bills?status=PENDING" />
+          <StatTile label="Available parking spots" :value="fmt(counts.availableParkingSpots)" icon="i-lucide-square-parking" color="success" :loading="loading" to="/parking-spots?status=AVAILABLE" />
+          <StatTile label="Utility collected" :sublabel="periodLabel" :value="fmtCurrencyCompact(revenue?.utilityCollected)" icon="i-lucide-wallet" color="success" :loading="loading" />
+        </div>
+      </section>
 
-    <section v-if="isAdmin">
-      <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-        Accounting overview
-      </h2>
-      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatTile
-          label="Open financial period"
-          :value="openFinancialPeriodLabel"
-          icon="i-lucide-calendar-range"
-          :color="openFinancialPeriodWarning ? 'warning' : 'primary'"
-          :loading="loading"
-          to="/accounting/financial-periods"
-        />
-        <StatTile
-          label="Draft journal entries"
-          :value="fmt(counts.draftJournalEntries)"
-          icon="i-lucide-file-cog"
-          color="warning"
-          :loading="loading"
-          to="/accounting/journal-entries?status=DRAFT"
-        />
-        <StatTile
-          label="Total expenses"
-          :sublabel="periodLabel"
-          :value="fmtCurrency(financialSummaryReport?.totalExpenses)"
-          icon="i-lucide-wallet"
-          color="warning"
-          :loading="loading"
-          to="/expenses"
-        />
-        <StatTile
-          label="Net income"
-          :sublabel="periodLabel"
-          :value="fmtCurrency(financialSummaryReport?.netIncome)"
-          icon="i-lucide-trending-up"
-          :color="(financialSummaryReport?.netIncome ?? 0) >= 0 ? 'success' : 'warning'"
-          :loading="loading"
-        />
-      </div>
-    </section>
+      <section v-if="isAdmin">
+        <DashboardSectionHeader icon="i-lucide-calculator" label="Accounting overview" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <StatTile
+            label="Open financial period"
+            :value="openFinancialPeriodLabel"
+            icon="i-lucide-calendar-range"
+            :color="openFinancialPeriodWarning ? 'warning' : 'primary'"
+            :loading="loading"
+            to="/accounting/financial-periods"
+          />
+          <StatTile
+            label="Draft journal entries"
+            :value="fmt(counts.draftJournalEntries)"
+            icon="i-lucide-file-cog"
+            color="warning"
+            :loading="loading"
+            to="/accounting/journal-entries?status=DRAFT"
+          />
+          <StatTile
+            label="Total expenses"
+            :sublabel="periodLabel"
+            :value="fmtCurrencyCompact(financialSummaryReport?.totalExpenses)"
+            icon="i-lucide-wallet"
+            color="neutral"
+            :loading="loading"
+            to="/expenses"
+          />
+          <StatTile
+            label="Net income"
+            :sublabel="periodLabel"
+            :value="fmtCurrencyCompact(financialSummaryReport?.netIncome)"
+            icon="i-lucide-trending-up"
+            :color="(financialSummaryReport?.netIncome ?? 0) >= 0 ? 'success' : 'error'"
+            :loading="loading"
+          />
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -241,6 +252,24 @@ const loading = ref(true)
 // longer blanks the whole dashboard, it just leaves that section's numbers
 // as "—" and lists what failed here.
 const sectionErrors = ref<string[]>([])
+
+const lastUpdated = ref<Date | null>(null)
+const lastUpdatedLabel = ref('')
+let lastUpdatedTimer: ReturnType<typeof setInterval> | undefined
+
+// Recomputed on an interval (not via computed()) so the "Xm ago" text keeps
+// advancing on its own even though lastUpdated itself isn't changing.
+function refreshLastUpdatedLabel() {
+  if (!lastUpdated.value) {
+    lastUpdatedLabel.value = ''
+    return
+  }
+  const seconds = Math.max(0, Math.floor((Date.now() - lastUpdated.value.getTime()) / 1000))
+  if (seconds < 5) lastUpdatedLabel.value = 'just now'
+  else if (seconds < 60) lastUpdatedLabel.value = `${seconds}s ago`
+  else if (seconds < 3600) lastUpdatedLabel.value = `${Math.floor(seconds / 60)}m ago`
+  else lastUpdatedLabel.value = lastUpdated.value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
 
 const counts = reactive({
   pendingUtilityBills: undefined as number | undefined,
@@ -285,13 +314,18 @@ const occupancyRateLabel = computed(() => {
 // statuses one-at-a-time) — Reserved and Maintenance both read as "warning"
 // on a badge, but sitting side by side in one bar they need to stay visually
 // separable, so Maintenance takes secondary (violet) here instead.
+// Maintenance is ordered *before* Reserved (not after, despite Available ->
+// Reserved reading more naturally) so Reserved's amber never sits directly
+// against Available's green — under protanopia that pair drops to OKLab
+// ΔE 5.7, below the accessibility floor; with violet between them the worst
+// adjacent pair clears ΔE 17 (validated via dataviz skill's validate_palette.js).
 const unitSegments = computed(() => {
   if (!occupancy.value) return []
   return [
     { key: 'occupied', label: 'Occupied', value: occupancy.value.occupiedUnits, barClass: 'bg-info', dotClass: 'bg-info' },
     { key: 'available', label: 'Available', value: occupancy.value.availableUnits, barClass: 'bg-success', dotClass: 'bg-success' },
-    { key: 'reserved', label: 'Reserved', value: occupancy.value.reservedUnits, barClass: 'bg-warning', dotClass: 'bg-warning' },
     { key: 'maintenance', label: 'Maintenance', value: occupancy.value.maintenanceUnits, barClass: 'bg-secondary', dotClass: 'bg-secondary' },
+    { key: 'reserved', label: 'Reserved', value: occupancy.value.reservedUnits, barClass: 'bg-warning', dotClass: 'bg-warning' },
     { key: 'blocked', label: 'Blocked', value: occupancy.value.unavailableUnits, barClass: 'bg-gray-400 dark:bg-gray-600', dotClass: 'bg-gray-400 dark:bg-gray-600' },
     { key: 'sold', label: 'Sold', value: occupancy.value.soldUnits, barClass: 'bg-gray-200 dark:bg-gray-700', dotClass: 'bg-gray-200 dark:bg-gray-700' }
   ].filter((s) => s.value > 0)
@@ -310,6 +344,13 @@ function fmt(value: number | undefined) {
 
 function fmtCurrency(value: number | undefined) {
   return formatCurrency(value)
+}
+
+// StatTile has little horizontal room — full precision (fmtCurrency) truncates
+// large amounts with an ellipsis there, so every currency value inside a tile
+// uses the compact form ($4.2M) instead.
+function fmtCurrencyCompact(value: number | undefined) {
+  return formatCurrencyCompact(value)
 }
 
 const periodLabel = 'This month'
@@ -379,7 +420,13 @@ async function load() {
   financialSummaryReport.value = financialSummaryRes ?? null
 
   loading.value = false
+  lastUpdated.value = new Date()
+  refreshLastUpdatedLabel()
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  lastUpdatedTimer = setInterval(refreshLastUpdatedLabel, 30_000)
+})
+onUnmounted(() => clearInterval(lastUpdatedTimer))
 </script>
