@@ -91,6 +91,7 @@ const items = computed<NavigationMenuItem[]>(() => [
 
   { label: 'Property', type: 'label' as const },
   { label: 'Properties', to: '/properties', icon: 'i-lucide-building' },
+  { label: 'Plots', to: '/plots', icon: 'i-lucide-map-pin' },
   { label: 'Buildings', to: '/buildings', icon: 'i-lucide-building-2' },
   { label: 'Floors', to: '/floors', icon: 'i-lucide-layers' },
   { label: 'Unit types', to: '/unit-types', icon: 'i-lucide-layout-grid' },
@@ -98,6 +99,7 @@ const items = computed<NavigationMenuItem[]>(() => [
   ...(isAdmin.value
     ? [
         { label: 'Zones', to: '/zones', icon: 'i-lucide-map' },
+        { label: 'Streets', to: '/streets', icon: 'i-lucide-route' },
         { label: 'Amenities', to: '/amenities', icon: 'i-lucide-sparkles' }
       ]
     : []),

@@ -1,11 +1,15 @@
-// Wraps the backend's BuildingController (/api/buildings). Every building
-// belongs to a property.
+// Wraps the backend's BuildingController (/api/buildings). Every building's
+// one true parent is a Plot (Property -> Zone -> Street -> Plot -> Building
+// -> Floor -> Unit); propertyId/propertyName are derived transitively
+// through the plot and included read-only for display and filtering.
 
 export type BuildingStatus = 'ACTIVE' | 'UNDER_CONSTRUCTION' | 'RENOVATION' | 'INACTIVE'
 
 export interface Building {
   id: number
-  propertyId: number
+  plotId: number | null
+  plotNumber: string | null
+  propertyId: number | null
   propertyName: string | null
   name: string
   code: string | null
@@ -17,6 +21,7 @@ export interface Building {
 }
 
 export interface BuildingFilter {
+  plotId?: number
   propertyId?: number
   name?: string
   status?: BuildingStatus
@@ -27,7 +32,7 @@ export interface BuildingFilter {
 }
 
 export interface CreateBuildingPayload {
-  propertyId: number
+  plotId: number
   name: string
   code?: string
   totalFloors?: number

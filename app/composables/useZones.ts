@@ -1,9 +1,12 @@
-// Wraps the backend's ZoneController (/api/zones). A zone is a geographic/
-// regional grouping of Properties (e.g. "North Zone", "Downtown"). The
-// controller exposes both a status toggle and a real delete endpoint.
+// Wraps the backend's ZoneController (/api/zones). A zone is a sub-division
+// within a Property (e.g. "Zone A", "Phase 2") — the level between Property
+// and Street: Property -> Zone -> Street -> Plot -> Building -> Floor ->
+// Unit. The controller exposes both a status toggle and a real delete endpoint.
 
 export interface Zone {
   id: number
+  propertyId: number | null
+  propertyName: string | null
   name: string
   code: string | null
   description: string | null
@@ -13,6 +16,7 @@ export interface Zone {
 }
 
 export interface ZoneFilter {
+  propertyId?: number
   name?: string
   active?: boolean
   sortBy?: string
@@ -21,7 +25,14 @@ export interface ZoneFilter {
   size?: number
 }
 
-export interface ZonePayload {
+export interface CreateZonePayload {
+  propertyId: number
+  name: string
+  code?: string
+  description?: string
+}
+
+export interface UpdateZonePayload {
   name: string
   code?: string
   description?: string
@@ -63,12 +74,12 @@ export function useZones() {
     return res.data
   }
 
-  async function create(payload: ZonePayload) {
+  async function create(payload: CreateZonePayload) {
     const res = await api<ApiEnvelope<Zone>>('/api/zones', { method: 'POST', body: payload })
     return res.data
   }
 
-  async function update(id: number, payload: ZonePayload) {
+  async function update(id: number, payload: UpdateZonePayload) {
     const res = await api<ApiEnvelope<Zone>>(`/api/zones/${id}`, { method: 'PUT', body: payload })
     return res.data
   }

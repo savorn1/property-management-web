@@ -8,6 +8,7 @@
     <UCard class="mb-4">
       <div class="flex flex-wrap gap-3">
         <UInput v-model="search" placeholder="Search name" icon="i-lucide-search" class="w-56" />
+        <USelect v-model="filter.propertyId" :items="propertyFilterOptions" placeholder="Property" class="w-40" />
         <USelect v-model="filter.active" :items="activeFilterOptions" placeholder="Status" class="w-32" />
         <UButton
           v-if="hasActiveFilter"
@@ -92,7 +93,7 @@
       <template #body>
         <DynamicForm
           v-model="createForm"
-          :fields="fields"
+          :fields="createFields"
           :loading="creating"
           :error="createError"
           submit-label="Create"
@@ -107,7 +108,7 @@
       <template #body>
         <DynamicForm
           v-model="editForm"
-          :fields="fields"
+          :fields="NAME_CODE_DESCRIPTION_FIELDS"
           :loading="editing"
           :error="editError"
           submit-label="Save changes"
@@ -148,23 +149,35 @@
 
 <script setup lang="ts">
 import type { ColumnDef, FieldDef } from '#shared/types'
-import type { Zone, ZonePayload } from '~/composables/useZones'
+import type { Zone, CreateZonePayload, UpdateZonePayload } from '~/composables/useZones'
 
 definePageMeta({ middleware: 'admin' })
 
 const { list, create, update, updateStatus, remove } = useZones()
+const { list: listProperties } = useProperties()
 const toast = useToast()
 
 const rows = ref<Zone[]>([])
 const loading = ref(false)
 const error = ref('')
 
-const filter = reactive<{ active: boolean | undefined }>({ active: undefined })
+const filter = reactive<{ propertyId: number | undefined; active: boolean | undefined }>({
+  propertyId: undefined,
+  active: undefined
+})
 const activeFilterOptions = [
   { label: 'All statuses', value: undefined },
   { label: 'Active', value: true },
   { label: 'Inactive', value: false }
 ]
+
+const propertyOptions = ref<{ label: string; value: number }[]>([])
+const propertyFilterOptions = computed(() => [{ label: 'All properties', value: undefined }, ...propertyOptions.value])
+
+async function loadPropertyOptions() {
+  const res = await listProperties({ size: 200 })
+  propertyOptions.value = res.data.map((p) => ({ label: p.name, value: p.id }))
+}
 
 const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
   column: 'id',
@@ -178,6 +191,7 @@ const { page, pageSize, total, rows: pagedRows, truncated, search } = useClientT
 
 const columns: ColumnDef<Zone>[] = [
   { key: 'name', sortable: true },
+  { key: 'propertyName', label: 'Property', value: (row) => row.propertyName ?? '—' },
   { key: 'code', value: (row) => row.code ?? '—' },
   { key: 'description', value: (row) => row.description ?? '—' },
   { key: 'active', type: 'boolean' },
@@ -189,6 +203,7 @@ async function load() {
   error.value = ''
   try {
     const res = await list({
+      propertyId: filter.propertyId,
       active: filter.active,
       sortBy: sort.value?.column,
       sortOrder: sort.value?.direction,
@@ -202,11 +217,16 @@ async function load() {
   }
 }
 
-const fields: FieldDef[] = [
+const NAME_CODE_DESCRIPTION_FIELDS: FieldDef[] = [
   { name: 'name', required: true },
   { name: 'code', hint: 'Unique short code, e.g. NORTH.' },
   { name: 'description', type: 'textarea', wrapper: 'full' }
 ]
+
+const createFields = computed<FieldDef[]>(() => [
+  { name: 'propertyId', label: 'Property', type: 'select', required: true, options: propertyOptions.value },
+  ...NAME_CODE_DESCRIPTION_FIELDS
+])
 
 const {
   showCreate,
@@ -225,7 +245,7 @@ const {
   deleting,
   confirmDelete,
   onDelete
-} = useCrudModals<Zone, ZonePayload>(
+} = useCrudModals<Zone, CreateZonePayload, UpdateZonePayload>(
   {
     create: (payload) => create(payload),
     update: (row, payload) => update(row.id, payload),
@@ -237,6 +257,12 @@ const {
     createDefaults: () => ({}),
     toForm: (row) => ({ name: row.name, code: row.code ?? '', description: row.description ?? '' }),
     toPayload: (values) => ({
+      propertyId: values.propertyId,
+      name: values.name,
+      code: values.code || undefined,
+      description: values.description || undefined
+    }),
+    toEditPayload: (values) => ({
       name: values.name,
       code: values.code || undefined,
       description: values.description || undefined
@@ -265,14 +291,20 @@ async function onStatusConfirm() {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  await loadPropertyOptions()
+  await load()
+})
 watch(sort, load)
-watch(() => filter.active, load)
+watch(() => [filter.propertyId, filter.active], load)
 
-const hasActiveFilter = computed(() => search.value !== '' || filter.active !== undefined)
+const hasActiveFilter = computed(
+  () => search.value !== '' || filter.propertyId !== undefined || filter.active !== undefined
+)
 
 function clearFilters() {
   search.value = ''
+  filter.propertyId = undefined
   filter.active = undefined
   load()
 }

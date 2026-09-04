@@ -14,7 +14,6 @@
           class="w-56"
         />
         <USelect v-model="filter.type" :items="typeFilterOptions" placeholder="Type" class="w-36" />
-        <USelect v-model="filter.zoneId" :items="zoneFilterOptions" placeholder="Zone" class="w-36" />
         <UButton
           v-if="hasActiveFilter"
           size="sm"
@@ -247,7 +246,6 @@ const {
   remove: removeImage,
   getObjectUrl: getImageUrl
 } = usePropertyImages()
-const { list: listZones } = useZones()
 const { isAdmin } = useAuth()
 const toast = useToast()
 
@@ -255,18 +253,9 @@ const rows = ref<PropertyItem[]>([])
 const loading = ref(false)
 const error = ref('')
 
-const filter = reactive<{ type: PropertyType | undefined; zoneId: number | undefined }>({
-  type: undefined,
-  zoneId: undefined
+const filter = reactive<{ type: PropertyType | undefined }>({
+  type: undefined
 })
-
-const zoneOptions = ref<{ label: string; value: number }[]>([])
-const zoneFilterOptions = computed(() => [{ label: 'All zones', value: undefined }, ...zoneOptions.value])
-
-async function loadZoneOptions() {
-  const res = await listZones({ size: 200 })
-  zoneOptions.value = res.data.map((z) => ({ label: z.name, value: z.id }))
-}
 
 const PROPERTY_TYPE_OPTIONS: { label: string; value: PropertyType }[] = [
   { label: 'Apartment', value: 'APARTMENT' },
@@ -294,7 +283,6 @@ const { page, pageSize, total, rows: pagedRows, truncated, search } = useClientT
 const columns: ColumnDef<PropertyItem>[] = [
   { key: 'name', sortable: true },
   { key: 'type', value: (row) => (row.type ? formatEnum(row.type) : '—') },
-  { key: 'zoneName', label: 'Zone', value: (row) => row.zoneName ?? '—' },
   { key: 'code', value: (row) => row.code ?? '—' },
   { key: 'city', value: (row) => row.city ?? '—' },
   { key: 'state', value: (row) => row.state ?? '—' },
@@ -308,7 +296,6 @@ async function load() {
   try {
     const res = await list({
       type: filter.type,
-      zoneId: filter.zoneId,
       sortBy: sort.value?.column,
       sortOrder: sort.value?.direction,
       size: 200
@@ -324,7 +311,6 @@ async function load() {
 const fields = computed<FieldDef[]>(() => [
   { name: 'name', required: true },
   { name: 'type', label: 'Property type', type: 'select', required: true, options: PROPERTY_TYPE_OPTIONS, wrapper: 'half' },
-  { name: 'zoneId', label: 'Zone', type: 'select', options: zoneOptions.value, wrapper: 'half' },
   { name: 'code', wrapper: 'half' },
   { name: 'address', wrapper: 'full' },
   { name: 'city' },
@@ -365,7 +351,6 @@ const {
       name: row.name,
       code: row.code ?? '',
       type: row.type ?? undefined,
-      zoneId: row.zoneId ?? undefined,
       address: row.address ?? '',
       city: row.city ?? '',
       state: row.state ?? '',
@@ -377,7 +362,6 @@ const {
       name: values.name,
       type: values.type,
       code: values.code || undefined,
-      zoneId: values.zoneId || undefined,
       address: values.address || undefined,
       city: values.city || undefined,
       state: values.state || undefined,
@@ -388,21 +372,17 @@ const {
   }
 )
 
-onMounted(async () => {
-  await loadZoneOptions()
-  await load()
-})
+onMounted(load)
 watch(sort, load)
-watch(() => [filter.type, filter.zoneId], load)
+watch(() => filter.type, load)
 
 const hasActiveFilter = computed(
-  () => search.value !== '' || filter.type !== undefined || filter.zoneId !== undefined
+  () => search.value !== '' || filter.type !== undefined
 )
 
 function clearFilters() {
   search.value = ''
   filter.type = undefined
-  filter.zoneId = undefined
   load()
 }
 

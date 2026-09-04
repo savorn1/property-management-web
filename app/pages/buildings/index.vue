@@ -204,6 +204,7 @@ import type { BuildingDocument } from '~/composables/useBuildingDocuments'
 const route = useRoute()
 const { list, create, update, remove } = useBuildings()
 const { list: listProperties } = useProperties()
+const { list: listPlots } = usePlots()
 const { list: listAmenities } = useAmenities()
 const { list: listFacilities, assign: assignFacility, remove: removeFacility } = useBuildingFacilities()
 const {
@@ -240,6 +241,16 @@ const propertyFilterOptions = computed(() => [{ label: 'All properties', value: 
 async function loadPropertyOptions() {
   const res = await listProperties({ size: 200 })
   propertyOptions.value = res.data.map((p) => ({ label: p.name, value: p.id }))
+}
+
+const plotOptions = ref<{ label: string; value: number }[]>([])
+
+async function loadPlotOptions() {
+  const res = await listPlots({ size: 200 })
+  plotOptions.value = res.data.map((p) => ({
+    label: `${p.plotNumber}${p.propertyName ? ` — ${p.propertyName}` : ''}`,
+    value: p.id
+  }))
 }
 
 const sort = ref<{ column: string; direction: 'asc' | 'desc' } | undefined>({
@@ -281,7 +292,7 @@ async function load() {
 }
 
 const createFields = computed<FieldDef[]>(() => [
-  { name: 'propertyId', label: 'Property', type: 'select', required: true, options: propertyOptions.value },
+  { name: 'plotId', label: 'Plot', type: 'select', required: true, options: plotOptions.value },
   { name: 'name', required: true },
   { name: 'code', wrapper: 'half' },
   { name: 'status', type: 'select', options: STATUS_OPTIONS, wrapper: 'half' },
@@ -323,7 +334,7 @@ const {
   load,
   {
     entityName: 'Building',
-    createDefaults: () => ({ propertyId: filter.propertyId }),
+    createDefaults: () => ({}),
     toForm: (row) => ({
       name: row.name,
       code: row.code ?? '',
@@ -332,7 +343,7 @@ const {
       description: row.description ?? ''
     }),
     toPayload: (values) => ({
-      propertyId: values.propertyId,
+      plotId: values.plotId,
       name: values.name,
       code: values.code || undefined,
       status: values.status || undefined,
@@ -469,7 +480,7 @@ watch(showDocuments, async (value) => {
 })
 
 onMounted(async () => {
-  await loadPropertyOptions()
+  await Promise.all([loadPropertyOptions(), loadPlotOptions()])
   await load()
 })
 watch(sort, load)

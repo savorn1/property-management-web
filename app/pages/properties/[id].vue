@@ -21,7 +21,6 @@
           <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
             {{ addressLine }}
             <span v-if="property.code" class="text-gray-400 dark:text-gray-500"> · {{ property.code }}</span>
-            <span v-if="property.zoneName" class="text-gray-400 dark:text-gray-500"> · {{ property.zoneName }}</span>
           </p>
         </div>
         <UButton icon="i-lucide-building-2" color="neutral" variant="soft" :to="`/buildings?propertyId=${property.id}`">

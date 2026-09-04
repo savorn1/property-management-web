@@ -91,7 +91,22 @@ const STATUS_META: Record<string, { color: StatusColor; icon: string }> = {
   // Building status (useBuildings' BuildingStatus) — ACTIVE/INACTIVE already
   // covered above.
   UNDER_CONSTRUCTION: { color: 'warning', icon: 'i-lucide-hard-hat' },
-  RENOVATION: { color: 'warning', icon: 'i-lucide-hammer' }
+  RENOVATION: { color: 'warning', icon: 'i-lucide-hammer' },
+  // Plot availability/reservation/sale status (usePlots) — AVAILABLE/
+  // NOT_FOR_SALE/RESERVED/EXPIRED/CANCELLED already covered above.
+  HOLD: { color: 'warning', icon: 'i-lucide-pause-circle' },
+  BLOCKED: { color: 'error', icon: 'i-lucide-lock' },
+  NONE: { color: 'neutral', icon: 'i-lucide-circle-dashed' },
+  NOT_SOLD: { color: 'neutral', icon: 'i-lucide-circle-dashed' },
+  CONTRACTED: { color: 'info', icon: 'i-lucide-file-signature' },
+  FULLY_PAID: { color: 'success', icon: 'i-lucide-badge-check' },
+  TRANSFERRED: { color: 'secondary', icon: 'i-lucide-file-check' },
+  // Plot lifecycle *stage* (usePlots' PLOT_STAGES — the named combination of
+  // availability+reservation+sale status, not a raw field value). AVAILABLE/
+  // HOLD/RESERVED/FULLY_PAID/TRANSFERRED reuse a raw field's own value as
+  // their stage key and are already covered above; only UNDER_CONTRACT has
+  // no single-field equivalent and needs its own entry.
+  UNDER_CONTRACT: { color: 'info', icon: 'i-lucide-file-signature' }
 }
 
 const DEFAULT_META: { color: StatusColor; icon: string } = {
